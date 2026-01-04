@@ -332,34 +332,40 @@ export default function DeviceListScreen() {
               </View>
 
               <View style={styles.deviceActions}>
-                <ActionIcon
-                  name="Wake"
-                  symbolName="bolt.fill"
-                  fallbackName="flash"
-                  color="#4CAF50"
-                  onPress={() => handleWake(item)}
-                />
-                <ActionIcon
-                  name="Sleep"
-                  symbolName="moon.fill"
-                  fallbackName="moon"
-                  color="#FF9800"
-                  onPress={() => handleSleep(item)}
-                />
-                <ActionIcon
-                  name="Reboot"
-                  symbolName="arrow.clockwise.circle.fill"
-                  fallbackName="refresh"
-                  color="#2196F3"
-                  onPress={() => handleReboot(item)}
-                />
-                <ActionIcon
-                  name="Shutdown"
-                  symbolName="power.circle.fill"
-                  fallbackName="power"
-                  color="#f44336"
-                  onPress={() => handleShutdown(item)}
-                />
+                {item.status?.toLowerCase() === 'offline' && (
+                  <ActionIcon
+                    name="Wake"
+                    symbolName="bolt.circle.fill"
+                    fallbackName="flash"
+                    color="#4CAF50"
+                    onPress={() => handleWake(item)}
+                  />
+                )}
+                {item.status?.toLowerCase() === 'online' && (
+                  <>
+                    <ActionIcon
+                      name="Sleep"
+                      symbolName="moon.circle.fill"
+                      fallbackName="moon"
+                      color="#FF9800"
+                      onPress={() => handleSleep(item)}
+                    />
+                    <ActionIcon
+                      name="Reboot"
+                      symbolName="arrow.clockwise.circle.fill"
+                      fallbackName="refresh"
+                      color="#2196F3"
+                      onPress={() => handleReboot(item)}
+                    />
+                    <ActionIcon
+                      name="Shutdown"
+                      symbolName="power.circle.fill"
+                      fallbackName="power"
+                      color="#f44336"
+                      onPress={() => handleShutdown(item)}
+                    />
+                  </>
+                )}
               </View>
             </View>
           </View>
