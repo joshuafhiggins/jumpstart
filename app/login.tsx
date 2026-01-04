@@ -55,7 +55,7 @@ export default function LoginScreen() {
 		>
 			<ScrollView contentContainerStyle={styles.scrollContent}>
 				<View style={styles.header}>
-					<Text style={[styles.title, { color: textColor }]}>Remote WoL</Text>
+					<Text style={[styles.title, { color: textColor }]}>Jumpstart</Text>
 					<Text style={[styles.subtitle, { color: subText }]}>
 						Mobile Frontend for UpSnap
 					</Text>

@@ -1,4 +1,4 @@
-# UpSnap Mobile
+# Jumpstart - Client for UpSnap
 
 A React Native Expo app that connects to an UpSnap server and provides mobile access to all Wake-on-LAN features.
 
