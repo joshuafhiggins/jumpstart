@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "remote-wol",
+    "name": "Remote WoL",
     "slug": "remote-wol",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,7 +10,8 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.remote-wol"
+      "icon": "./assets/remotewol-ios.icon",
+      "bundleIdentifier": "com.abunchofknowitalls.remotewol-upsnap"
     },
     "android": {
       "adaptiveIcon": {

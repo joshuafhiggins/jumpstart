@@ -5,10 +5,11 @@ import { AuthResponse, User } from '../types';
 
 interface AuthContextType {
   user: User | null;
+  serverAddress: string | null;
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (identity: string, password: string, isSuperuser?: boolean) => Promise<void>;
+  login: (serverAddress: string, identity: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -16,6 +17,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [serverAddress, setServerAddress] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -27,11 +29,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const storedToken = await AsyncStorage.getItem('auth_token');
       const storedUser = await AsyncStorage.getItem('auth_user');
+      const storedServerAddress = await AsyncStorage.getItem('auth_server_address');
       
       if (storedToken && storedUser) {
         setToken(storedToken);
         api.setToken(storedToken);
         setUser(JSON.parse(storedUser));
+      }
+
+      if (storedServerAddress) {
+        setServerAddress(storedServerAddress);
+        api.setAddress(storedServerAddress + '/api');
       }
     } catch (error) {
       console.error('Failed to load auth', error);
@@ -40,15 +48,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (identity: string, password: string, isSuperuser = false) => {
+  const login = async (serverAddress: string, identity: string, password: string) => {
     try {
-      const response: AuthResponse = await api.authenticate(identity, password, isSuperuser);
+      const response: AuthResponse = await api.authenticate(serverAddress, identity, password);
       
       await AsyncStorage.setItem('auth_token', response.token);
       await AsyncStorage.setItem('auth_user', JSON.stringify(response.record));
+      await AsyncStorage.setItem('auth_server_address', serverAddress);
       
       setToken(response.token);
       setUser(response.record);
+      setServerAddress(serverAddress);
     } catch (error) {
       throw error;
     }
@@ -60,8 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AsyncStorage.removeItem('auth_user');
       
       api.clearToken();
+      api.clearAddress();
       setToken(null);
       setUser(null);
+      setServerAddress(null);
     } catch (error) {
       console.error('Failed to logout', error);
     }
@@ -70,6 +82,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <AuthContext.Provider
       value={{
+        serverAddress,
         user,
         token,
         isAuthenticated: !!token && !!user,

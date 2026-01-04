@@ -1,66 +1,111 @@
-import React, { useState, useEffect } from "react";
-import {
-	View,
-	Text,
-	FlatList,
-	TouchableOpacity,
-	StyleSheet,
-	RefreshControl,
-	Alert,
-	ActivityIndicator,
-} from "react-native";
-import { ContextMenu, Button as SwiftUIButton, Host } from "@expo/ui/swift-ui";
-import { useRouter, useLocalSearchParams, Stack } from "expo-router";
+import { ContextMenu, Host, Button as SwiftUIButton } from "@expo/ui/swift-ui";
 import { Ionicons } from "@expo/vector-icons";
+import { SymbolView } from "expo-symbols";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+	ActivityIndicator,
+	Alert,
+	AppState,
+	FlatList,
+	RefreshControl,
+	StyleSheet,
+	Text,
+	TouchableOpacity,
+	View,
+} from "react-native";
+import { useColorScheme } from "../../hooks/use-color-scheme";
 import api from "../../src/services/api";
 import { Device } from "../../src/types";
-
-function DevicesHeader() {
-	const router = useRouter();
-
-	return (
-		<View>
-			<TouchableOpacity onPress={() => router.push("/scan-devices")}>
-				<Ionicons name="add-circle-outline" size={24} color="#007AFF" />
-			</TouchableOpacity>
-		</View>
-	);
-}
+import * as Burnt from "burnt";
 
 export default function DeviceListScreen() {
-	const router = useRouter();
+	const colorScheme = useColorScheme() ?? "light";
+	const isDark = colorScheme === "dark";
+	const bgColor = isDark ? "#0b0b0d" : "#f5f5f5";
+	const cardBg = isDark ? "#1c1c1e" : "#fff";
+	const textColor = isDark ? "#ffffff" : "#333333";
+	const subTextColor = isDark ? "#c6c6c8" : "#666666";
+	const activityColor = isDark ? "#0A84FF" : "#007AFF";
+
 	const [devices, setDevices] = useState<Device[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 
-	useEffect(() => {
-		loadDevices();
-	}, []);
-
-	const loadDevices = async () => {
+	const fetchDevices = useCallback(async (showLoading = false) => {
 		try {
-			setIsLoading(true);
+			if (showLoading) setIsLoading(true);
 			const data = await api.getDevices();
 			setDevices(data);
 		} catch (error: any) {
-			Alert.alert("Error", error.message || "Failed to load devices");
+			// For background/periodic refreshes, avoid interruptive alerts
+			if (showLoading) {
+				Alert.alert("Error", error.message || "Failed to load devices");
+			}
 		} finally {
-			setIsLoading(false);
+			if (showLoading) setIsLoading(false);
 		}
-	};
+	}, []);
+
+	useEffect(() => {
+		fetchDevices(true);
+	}, [fetchDevices]);
+
+	useEffect(() => {
+		let intervalId: number | null = null;
+
+		const startPolling = () => {
+			if (intervalId !== null) return;
+			intervalId = setInterval(() => {
+				fetchDevices(false);
+			}, 10000) as unknown as number;
+		};
+
+		const stopPolling = () => {
+			if (intervalId !== null) {
+				clearInterval(intervalId);
+				intervalId = null;
+			}
+		};
+
+		// Start polling while app is active; pause when backgrounded
+		startPolling();
+
+		const onAppStateChange = (nextAppState: string) => {
+			if (nextAppState === "active") {
+				startPolling();
+			} else {
+				stopPolling();
+			}
+		};
+
+		const subscription = AppState.addEventListener("change", onAppStateChange);
+
+		return () => {
+			stopPolling();
+			subscription.remove();
+		};
+	}, [fetchDevices]);
 
 	const onRefresh = async () => {
 		setRefreshing(true);
-		await loadDevices();
+		await fetchDevices(false);
 		setRefreshing(false);
 	};
 
 	const handleWake = async (device: Device) => {
 		try {
 			await api.wakeDevice(device.id);
-			Alert.alert("Success", `Wake signal sent to ${device.name}`);
+      Burnt.toast({
+        title: "Success",
+        preset: "done",
+        message: `Waking ${device.name} up.`,
+      });
 		} catch (error: any) {
-			Alert.alert("Error", error.message || "Failed to wake device");
+      Burnt.toast({
+        title: "Error",
+        preset: "error",
+        message: error.message || `Failed to wake up ${device.name}.`,
+      });
 		}
 	};
 
@@ -73,9 +118,17 @@ export default function DeviceListScreen() {
 				onPress: async () => {
 					try {
 						await api.sleepDevice(device.id);
-						Alert.alert("Success", `Sleep signal sent to ${device.name}`);
+						Burnt.toast({
+              title: "Success",
+              preset: "done",
+              message: `Sending ${device.name} to sleep.`,
+            });
 					} catch (error: any) {
-						Alert.alert("Error", error.message || "Failed to sleep device");
+						Burnt.toast({
+              title: "Error",
+              preset: "error",
+              message: error.message || `Failed to send ${device.name} to sleep.`,
+            });
 					}
 				},
 			},
@@ -91,9 +144,17 @@ export default function DeviceListScreen() {
 				onPress: async () => {
 					try {
 						await api.rebootDevice(device.id);
-						Alert.alert("Success", `Reboot signal sent to ${device.name}`);
+						Burnt.toast({
+              title: "Success",
+              preset: "done",
+              message: `Rebooting ${device.name}.`,
+            });
 					} catch (error: any) {
-						Alert.alert("Error", error.message || "Failed to reboot device");
+						Burnt.toast({
+              title: "Error",
+              preset: "error",
+              message: error.message || `Failed to reboot ${device.name}`,
+            });
 					}
 				},
 			},
@@ -112,12 +173,17 @@ export default function DeviceListScreen() {
 					onPress: async () => {
 						try {
 							await api.shutdownDevice(device.id);
-							Alert.alert("Success", `Shutdown signal sent to ${device.name}`);
+              Burnt.toast({
+                title: "Success",
+                preset: "done",
+                message: `Shutting down ${device.name}.`,
+              });
 						} catch (error: any) {
-							Alert.alert(
-								"Error",
-								error.message || "Failed to shutdown device"
-							);
+              Burnt.toast({
+                title: "Error",
+                preset: "error",
+                message: error.message || `Failed to shut down ${device.name}.`,
+              });
 						}
 					},
 				},
@@ -128,15 +194,30 @@ export default function DeviceListScreen() {
 	const handleDelete = (device: Device) => {
 		Alert.alert("Delete Device", `Delete "${device.name}"?`, [
 			{
+				text: "Cancel",
+				style: "cancel",
+				onPress: () => {
+					// Close alert
+				},
+			},
+			{
 				text: "Delete",
 				style: "destructive",
 				onPress: async () => {
 					try {
 						await api.deleteDevice(device.id);
-						Alert.alert("Success", "Device deleted successfully");
-						loadDevices();
+            Burnt.toast({
+              title: "Success",
+              preset: "done",
+              message: `Deleted ${device.name} successfully.`,
+            });
+						fetchDevices(false);
 					} catch (error: any) {
-						Alert.alert("Error", error.message || "Failed to delete device");
+            Burnt.toast({
+              title: "Error",
+              preset: "error",
+              message: error.message || `Failed to delete ${device.name}.`,
+            });
 					}
 				},
 			},
@@ -154,6 +235,42 @@ export default function DeviceListScreen() {
 		}
 	};
 
+	const ActionIcon = ({
+		name,
+		symbolName,
+		color,
+		onPress,
+		fallbackName,
+	}: {
+		name: string;
+		symbolName: string;
+		color: string;
+		onPress: () => void;
+		fallbackName?: string;
+	}) => (
+		<TouchableOpacity
+			style={styles.actionIconContainer}
+			onPress={onPress}
+			accessibilityLabel={name}
+			activeOpacity={0.75}
+		>
+			<SymbolView
+				name={symbolName as any}
+				size={20}
+				tintColor={color}
+				type="monochrome"
+				fallback={
+					<Ionicons
+						name={(fallbackName || "ellipse") as any}
+						size={20}
+						color={color}
+					/>
+				}
+				style={styles.actionIcon}
+			/>
+		</TouchableOpacity>
+	);
+
 	const renderDevice = ({ item }: { item: Device }) => (
 		<Host>
 			<ContextMenu activationMethod="longPress">
@@ -167,51 +284,83 @@ export default function DeviceListScreen() {
 					</SwiftUIButton>
 				</ContextMenu.Items>
 				<ContextMenu.Trigger>
-					<View style={styles.deviceCard}>
-						<TouchableOpacity
-							onPress={() => router.push(`/devices/${item.id}`)}
-							activeOpacity={1}
-						>
+					<View
+						style={[
+							styles.deviceCard,
+							{
+								backgroundColor: cardBg,
+								shadowColor: isDark ? "rgba(0,0,0,0.6)" : "#000",
+							},
+						]}
+					>
+						<View>
 							<View style={styles.deviceHeader}>
 								<View style={styles.deviceInfo}>
-									<Text style={styles.deviceName}>{item.name}</Text>
-									<Text style={styles.deviceIP}>{item.ip}</Text>
+									<Text style={[styles.deviceName, { color: textColor }]}>
+										{item.name}
+									</Text>
+									<Text style={[styles.deviceIP, { color: subTextColor }]}>
+										{item.mac}
+									</Text>
 								</View>
-								<View
+								<SymbolView
+									name="circle.fill"
+									size={18}
+									tintColor={getStatusColor(item.status)}
+									animationSpec={{
+										effect: { type: "pulse" },
+										repeating: true,
+										speed: 1,
+									}}
+									fallback={
+										<View
+											style={[
+												styles.statusDot,
+												{ backgroundColor: getStatusColor(item.status) },
+											]}
+										/>
+									}
 									style={[
-										styles.statusDot,
-										{ backgroundColor: getStatusColor(item.status) },
+										styles.statusSymbol,
+										{
+											shadowColor: getStatusColor(item.status),
+											shadowOpacity: isDark ? 0.9 : 0.6,
+										},
 									]}
 								/>
 							</View>
 
 							<View style={styles.deviceActions}>
-								<TouchableOpacity
-									style={[styles.actionButton, styles.wakeButton]}
+								<ActionIcon
+									name="Wake"
+									symbolName="bolt.fill"
+									fallbackName="flash"
+									color="#4CAF50"
 									onPress={() => handleWake(item)}
-								>
-									<Text style={styles.actionButtonText}>Wake</Text>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={[styles.actionButton, styles.sleepButton]}
+								/>
+								<ActionIcon
+									name="Sleep"
+									symbolName="moon.fill"
+									fallbackName="moon"
+									color="#FF9800"
 									onPress={() => handleSleep(item)}
-								>
-									<Text style={styles.actionButtonText}>Sleep</Text>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={[styles.actionButton, styles.rebootButton]}
+								/>
+								<ActionIcon
+									name="Reboot"
+									symbolName="arrow.clockwise.circle.fill"
+									fallbackName="refresh"
+									color="#2196F3"
 									onPress={() => handleReboot(item)}
-								>
-									<Text style={styles.actionButtonText}>Reboot</Text>
-								</TouchableOpacity>
-								<TouchableOpacity
-									style={[styles.actionButton, styles.shutdownButton]}
+								/>
+								<ActionIcon
+									name="Shutdown"
+									symbolName="power.circle.fill"
+									fallbackName="power"
+									color="#f44336"
 									onPress={() => handleShutdown(item)}
-								>
-									<Text style={styles.actionButtonText}>Shutdown</Text>
-								</TouchableOpacity>
+								/>
 							</View>
-						</TouchableOpacity>
+						</View>
 					</View>
 				</ContextMenu.Trigger>
 			</ContextMenu>
@@ -221,19 +370,13 @@ export default function DeviceListScreen() {
 	if (isLoading) {
 		return (
 			<View style={styles.loadingContainer}>
-				<ActivityIndicator size="large" color="#007AFF" />
+				<ActivityIndicator size="large" color={activityColor} />
 			</View>
 		);
 	}
 
 	return (
-		<View style={styles.container}>
-			<Stack.Screen
-				options={{
-					title: "Devices",
-					headerRight: () => <DevicesHeader />,
-				}}
-			/>
+		<View style={[styles.container, { backgroundColor: bgColor }]}>
 			<FlatList
 				data={devices}
 				renderItem={renderDevice}
@@ -244,7 +387,9 @@ export default function DeviceListScreen() {
 				}
 				ListEmptyComponent={
 					<View style={styles.emptyContainer}>
-						<Text style={styles.emptyText}>No devices found</Text>
+						<Text style={[styles.emptyText, { color: subTextColor }]}>
+							No devices found
+						</Text>
 					</View>
 				}
 			/>
@@ -271,12 +416,13 @@ const styles = StyleSheet.create({
 	},
 	list: {
 		padding: 15,
+		gap: 15,
 	},
 	deviceCard: {
 		backgroundColor: "#fff",
 		borderRadius: 12,
 		padding: 15,
-		marginBottom: 15,
+		paddingRight: 25,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.1,
@@ -309,14 +455,27 @@ const styles = StyleSheet.create({
 	},
 	deviceActions: {
 		flexDirection: "row",
-		justifyContent: "space-between",
-		gap: 8,
-	},
-	actionButton: {
-		flex: 1,
-		paddingVertical: 10,
-		borderRadius: 8,
 		alignItems: "center",
+		justifyContent: "flex-start",
+		marginTop: 8,
+		paddingBottom: 6,
+	},
+	actionIconContainer: {
+		padding: 6,
+		marginRight: 12,
+		justifyContent: "center",
+		alignItems: "center",
+		minWidth: 36,
+		minHeight: 36,
+	},
+	actionIcon: {
+		width: 22,
+		height: 22,
+	},
+	actionButtonText: {
+		color: "#fff",
+		fontWeight: "600",
+		fontSize: 12,
 	},
 	wakeButton: {
 		backgroundColor: "#4CAF50",
@@ -330,10 +489,14 @@ const styles = StyleSheet.create({
 	shutdownButton: {
 		backgroundColor: "#f44336",
 	},
-	actionButtonText: {
-		color: "#fff",
-		fontWeight: "600",
-		fontSize: 12,
+	statusSymbol: {
+		width: 18,
+		height: 18,
+		borderRadius: 9,
+		shadowOffset: { width: 0, height: 0 },
+		shadowOpacity: 0.6,
+		shadowRadius: 8,
+		elevation: 6,
 	},
 	emptyContainer: {
 		alignItems: "center",

@@ -1,245 +1,256 @@
-import { Device, AuthResponse, NetworkScanResult } from '../types';
-
-const API_BASE_URL = 'https://wol.f6knight.duckdns.org/api';
+import { Device, AuthResponse, NetworkScanResult } from "../types";
 
 class UpSnapAPI {
-  private token: string | null = null;
+	private token: string | null = null;
+	private address: string | null = null;
 
-  setToken(token: string) {
-    this.token = token;
-  }
+	setToken(token: string) {
+		this.token = token;
+	}
 
-  getToken(): string | null {
-    return this.token;
-  }
+	getToken(): string | null {
+		return this.token;
+	}
 
-  clearToken() {
-    this.token = null;
-  }
+	clearToken() {
+		this.token = null;
+	}
 
-  private getHeaders(): HeadersInit {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-    
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-    
-    return headers;
-  }
+	setAddress(address: string) {
+		this.address = address;
+	}
 
-  async authenticate(identity: string, password: string, isSuperuser = false): Promise<AuthResponse> {
-    const endpoint = isSuperuser 
-      ? `${API_BASE_URL}/collections/_superusers/auth-with-password`
-      : `${API_BASE_URL}/collections/users/auth-with-password`;
-    
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ identity, password }),
-    });
+	getAddress(): string | null {
+		return this.address;
+	}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Authentication failed');
-    }
+	clearAddress() {
+		this.address = null;
+	}
 
-    const data: AuthResponse = await response.json();
-    this.token = data.token;
-    return data;
-  }
+	private getHeaders(): HeadersInit {
+		const headers: HeadersInit = {
+			"Content-Type": "application/json",
+		};
 
-  async getDevices(page = 1, perPage = 30): Promise<Device[]> {
-    const response = await fetch(
-      `${API_BASE_URL}/collections/devices/records?page=${page}&perPage=${perPage}`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+		if (this.token) {
+			headers["Authorization"] = `Bearer ${this.token}`;
+		}
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch devices');
-    }
+		return headers;
+	}
 
-    const data = await response.json();
-    return data.items;
-  }
+	async authenticate(
+		serverAddress: string,
+		identity: string,
+		password: string
+	): Promise<AuthResponse> {
+		this.address = serverAddress + "/api";
 
-  async getDevice(id: string): Promise<Device> {
-    const response = await fetch(
-      `${API_BASE_URL}/collections/devices/records/${id}`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+		const response = await fetch(
+			`${this.address}/collections/users/auth-with-password`,
+			{
+				method: "POST",
+				headers: this.getHeaders(),
+				body: JSON.stringify({ identity, password }),
+			}
+		);
 
-    if (!response.ok) {
-      throw new Error('Failed to fetch device');
-    }
+		if (!response.ok) {
+			const response = await fetch(
+				`${this.address}/collections/_superusers/auth-with-password`,
+				{
+					method: "POST",
+					headers: this.getHeaders(),
+					body: JSON.stringify({ identity, password }),
+				}
+			);
 
-    return response.json();
-  }
+			if (!response.ok) {
+				const error = await response.json();
+				throw new Error(error.message || "Authentication failed");
+			}
 
-  async createDevice(device: Partial<Device>): Promise<Device> {
-    const response = await fetch(
-      `${API_BASE_URL}/collections/devices/records`,
-      {
-        method: 'POST',
-        headers: this.getHeaders(),
-        body: JSON.stringify(device),
-      }
-    );
+			const data: AuthResponse = await response.json();
+			this.token = data.token;
+			return data;
+		}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create device');
-    }
+		const data: AuthResponse = await response.json();
+		this.token = data.token;
+		return data;
+	}
 
-    return response.json();
-  }
+	async getDevices(page = 1, perPage = 100): Promise<Device[]> {
+		const response = await fetch(
+			`${this.address}/collections/devices/records?page=${page}&perPage=${perPage}`,
+			{
+				headers: this.getHeaders(),
+			}
+		);
 
-  async updateDevice(id: string, device: Partial<Device>): Promise<Device> {
-    const response = await fetch(
-      `${API_BASE_URL}/collections/devices/records/${id}`,
-      {
-        method: 'PATCH',
-        headers: this.getHeaders(),
-        body: JSON.stringify(device),
-      }
-    );
+		if (!response.ok) {
+			throw new Error("Failed to fetch devices");
+		}
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to update device');
-    }
+		const data = await response.json();
+		return data.items;
+	}
 
-    return response.json();
-  }
+	async getDevice(id: string): Promise<Device> {
+		const response = await fetch(
+			`${this.address}/collections/devices/records/${id}`,
+			{
+				headers: this.getHeaders(),
+			}
+		);
 
-  async deleteDevice(id: string): Promise<void> {
-    const response = await fetch(
-      `${API_BASE_URL}/collections/devices/records/${id}`,
-      {
-        method: 'DELETE',
-        headers: this.getHeaders(),
-      }
-    );
+		if (!response.ok) {
+			throw new Error("Failed to fetch device");
+		}
 
-    if (!response.ok) {
-      throw new Error('Failed to delete device');
-    }
-  }
+		return response.json();
+	}
 
-  async wakeDevice(id: string): Promise<void> {
-    const response = await fetch(
-      `${API_BASE_URL}/upsnap/wake/${id}`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+	async createDevice(device: Partial<Device>): Promise<Device> {
+		const response = await fetch(
+			`${this.address}/collections/devices/records`,
+			{
+				method: "POST",
+				headers: this.getHeaders(),
+				body: JSON.stringify(device),
+			}
+		);
 
-    if (!response.ok) {
-      throw new Error('Failed to wake device');
-    }
-  }
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.message || "Failed to create device");
+		}
 
-  async wakeGroup(id: string): Promise<void> {
-    const response = await fetch(
-      `${API_BASE_URL}/upsnap/wakegroup/${id}`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+		return response.json();
+	}
 
-    if (!response.ok) {
-      throw new Error('Failed to wake group');
-    }
-  }
+	async updateDevice(id: string, device: Partial<Device>): Promise<Device> {
+		const response = await fetch(
+			`${this.address}/collections/devices/records/${id}`,
+			{
+				method: "PATCH",
+				headers: this.getHeaders(),
+				body: JSON.stringify(device),
+			}
+		);
 
-  async sleepDevice(id: string): Promise<void> {
-    const response = await fetch(
-      `${API_BASE_URL}/upsnap/sleep/${id}`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+		if (!response.ok) {
+			const error = await response.json();
+			throw new Error(error.message || "Failed to update device");
+		}
 
-    if (!response.ok) {
-      throw new Error('Failed to sleep device');
-    }
-  }
+		return response.json();
+	}
 
-  async rebootDevice(id: string): Promise<void> {
-    const response = await fetch(
-      `${API_BASE_URL}/upsnap/reboot/${id}`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+	async deleteDevice(id: string): Promise<void> {
+		const response = await fetch(
+			`${this.address}/collections/devices/records/${id}`,
+			{
+				method: "DELETE",
+				headers: this.getHeaders(),
+			}
+		);
 
-    if (!response.ok) {
-      throw new Error('Failed to reboot device');
-    }
-  }
+		if (!response.ok) {
+			throw new Error("Failed to delete device");
+		}
+	}
 
-  async shutdownDevice(id: string): Promise<void> {
-    const response = await fetch(
-      `${API_BASE_URL}/upsnap/shutdown/${id}`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+	async wakeDevice(id: string): Promise<void> {
+		const response = await fetch(`${this.address}/upsnap/wake/${id}`, {
+			headers: this.getHeaders(),
+		});
 
-    if (!response.ok) {
-      throw new Error('Failed to shutdown device');
-    }
-  }
+		if (!response.ok) {
+			throw new Error("Failed to wake device");
+		}
+	}
 
-  async scanNetwork(): Promise<NetworkScanResult[]> {
-    const response = await fetch(
-      `${API_BASE_URL}/upsnap/scan`,
-      {
-        headers: this.getHeaders(),
-      }
-    );
+	async wakeGroup(id: string): Promise<void> {
+		const response = await fetch(`${this.address}/upsnap/wakegroup/${id}`, {
+			headers: this.getHeaders(),
+		});
 
-    if (!response.ok) {
-      throw new Error('Failed to scan network');
-    }
+		if (!response.ok) {
+			throw new Error("Failed to wake group");
+		}
+	}
 
-    const data = await response.json();
-    console.log('Raw scan data:', data);
-    
-    if (data.devices && Array.isArray(data.devices)) {
-      return data.devices.map((item: any) => ({
-        name: item.name || item.hostname || 'Unknown',
-        ip: item.ip || item.ip_address || '',
-        mac: item.mac || item.mac_address || '',
-        mac_vendor: item.mac_vendor || 'Unknown',
-      }));
-    }
-    
-    if (Array.isArray(data)) {
-      return data.map((item: any) => ({
-        name: item.name || item.hostname || 'Unknown',
-        ip: item.ip || item.ip_address || '',
-        mac: item.mac || item.mac_address || '',
-        mac_vendor: item.mac_vendor || 'Unknown',
-      }));
-    }
-    
-    if (data.items && Array.isArray(data.items)) {
-      return data.items.map((item: any) => ({
-        name: item.name || item.hostname || 'Unknown',
-        ip: item.ip || item.ip_address || '',
-        mac: item.mac || item.mac_address || '',
-        mac_vendor: item.mac_vendor || 'Unknown',
-      }));
-    }
-    
-    return [];
-  }
+	async sleepDevice(id: string): Promise<void> {
+		const response = await fetch(`${this.address}/upsnap/sleep/${id}`, {
+			headers: this.getHeaders(),
+		});
+
+		if (!response.ok) {
+			throw new Error("Failed to sleep device");
+		}
+	}
+
+	async rebootDevice(id: string): Promise<void> {
+		const response = await fetch(`${this.address}/upsnap/reboot/${id}`, {
+			headers: this.getHeaders(),
+		});
+
+		if (!response.ok) {
+			throw new Error("Failed to reboot device");
+		}
+	}
+
+	async shutdownDevice(id: string): Promise<void> {
+		const response = await fetch(`${this.address}/upsnap/shutdown/${id}`, {
+			headers: this.getHeaders(),
+		});
+
+		if (!response.ok) {
+			throw new Error("Failed to shutdown device");
+		}
+	}
+
+	async scanNetwork(): Promise<NetworkScanResult[]> {
+		const response = await fetch(`${this.address}/upsnap/scan`, {
+			headers: this.getHeaders(),
+		});
+
+		if (!response.ok) {
+			throw new Error("Failed to scan network");
+		}
+
+		const data = await response.json();
+		if (data.devices && Array.isArray(data.devices)) {
+			return data.devices.map((item: any) => ({
+				name: item.name || item.hostname || "Unknown",
+				ip: item.ip || item.ip_address || "",
+				mac: item.mac || item.mac_address || "",
+				mac_vendor: item.mac_vendor || "Unknown",
+			}));
+		}
+
+		if (Array.isArray(data)) {
+			return data.map((item: any) => ({
+				name: item.name || item.hostname || "Unknown",
+				ip: item.ip || item.ip_address || "",
+				mac: item.mac || item.mac_address || "",
+				mac_vendor: item.mac_vendor || "Unknown",
+			}));
+		}
+
+		if (data.items && Array.isArray(data.items)) {
+			return data.items.map((item: any) => ({
+				name: item.name || item.hostname || "Unknown",
+				ip: item.ip || item.ip_address || "",
+				mac: item.mac || item.mac_address || "",
+				mac_vendor: item.mac_vendor || "Unknown",
+			}));
+		}
+
+		return [];
+	}
 }
 
 export default new UpSnapAPI();
