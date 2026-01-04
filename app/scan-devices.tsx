@@ -177,7 +177,7 @@ export default function ScanDevicesScreen() {
 			{devices.length === 0 && !scanning && (
 				<View style={styles.emptyContainer}>
 					<Text style={styles.emptyText}>
-						Tap "Scan Network" to discover devices
+						Tap &quot;Scan Network&quot; to discover devices
 					</Text>
 				</View>
 			)}
