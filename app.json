@@ -11,7 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/remotewol-ios.icon",
-      "bundleIdentifier": "com.abunchofknowitalls.remotewol-upsnap"
+      "bundleIdentifier": "com.abunchofknowitalls.remotewol-upsnap",
+      "appleTeamId": "8S7C654DQ4"
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +41,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true,
