@@ -2,69 +2,92 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
+// MARK: - Control Widget for Quick Wake Action
+
 struct widgetControl: ControlWidget {
-    static let kind: String = "com.developer.example.widget"
+    static let kind: String = "wakecontrol"
 
     var body: some ControlWidgetConfiguration {
         AppIntentControlConfiguration(
             kind: Self.kind,
-            provider: Provider()
+            provider: WakeControlProvider()
         ) { value in
-            ControlWidgetToggle(
-                "Start Timer",
-                isOn: value.isRunning,
-                action: StartTimerIntent(value.name)
-            ) { isRunning in
-                Label(isRunning ? "On" : "Off", systemImage: "timer")
+            ControlWidgetButton(action: WakeDeviceIntent(deviceId: value.deviceId, deviceName: value.deviceName)) {
+                Label(value.deviceName, systemImage: "bolt.fill")
             }
         }
-        .displayName("Timer")
-        .description("A an example control that runs a timer.")
+        .displayName("Wake Device")
+        .description("Quickly wake a device from Control Center.")
     }
 }
+
+// MARK: - Control Widget Value
 
 extension widgetControl {
     struct Value {
-        var isRunning: Bool
-        var name: String
-    }
-
-    struct Provider: AppIntentControlValueProvider {
-        func previewValue(configuration: TimerConfiguration) -> Value {
-            widgetControl.Value(isRunning: false, name: configuration.timerName)
-        }
-
-        func currentValue(configuration: TimerConfiguration) async throws -> Value {
-            let isRunning = true // Check if the timer is running
-            return widgetControl.Value(isRunning: isRunning, name: configuration.timerName)
-        }
+        var deviceId: String
+        var deviceName: String
     }
 }
 
-struct TimerConfiguration: ControlConfigurationIntent {
-    static let title: LocalizedStringResource = "Timer Name Configuration"
+// MARK: - Control Widget Provider
 
-    @Parameter(title: "Timer Name", default: "Timer")
-    var timerName: String
+struct WakeControlProvider: AppIntentControlValueProvider {
+    func previewValue(configuration: WakeControlConfiguration) -> widgetControl.Value {
+        widgetControl.Value(
+            deviceId: configuration.device?.id ?? "",
+            deviceName: configuration.device?.name ?? "Select Device"
+        )
+    }
+
+    func currentValue(configuration: WakeControlConfiguration) async throws -> widgetControl.Value {
+        widgetControl.Value(
+            deviceId: configuration.device?.id ?? "",
+            deviceName: configuration.device?.name ?? "Select Device"
+        )
+    }
 }
 
-struct StartTimerIntent: SetValueIntent {
-    static let title: LocalizedStringResource = "Start a timer"
+// MARK: - Control Widget Configuration Intent
 
-    @Parameter(title: "Timer Name")
-    var name: String
+struct WakeControlConfiguration: ControlConfigurationIntent {
+    static let title: LocalizedStringResource = "Device to Wake"
 
-    @Parameter(title: "Timer is running")
-    var value: Bool
+    @Parameter(title: "Device")
+    var device: DeviceEntity?
+}
 
-    init() {}
+// MARK: - Wake Device Intent (Opens Deep Link)
 
-    init(_ name: String) {
-        self.name = name
-    }
+struct WakeDeviceIntent: AppIntent { 
+ static var title: LocalizedStringResource = "Wake Device"
+ static var description = IntentDescription("Wakes the selected device using Wake-on-LAN.")
+ static var openAppWhenRun: Bool = true
+ static var isDiscoverable: Bool = true
 
-    func perform() async throws -> some IntentResult {
-        // Start the timer…
-        return .result()
-    }
+ @Parameter(title: "Device ID")
+ var deviceId: String
+
+ @Parameter(title: "Device Name")
+ var deviceName: String
+
+//  static var parameterSummary: some ParameterSummary {
+//    Summary("Wake \(\.$deviceName)")
+//  }
+
+ init() {
+   self.deviceId = ""
+   self.deviceName = ""
+ }
+
+ init(deviceId: String, deviceName: String) {
+   self.deviceId = deviceId
+   self.deviceName = deviceName
+ }
+
+ func perform() async throws -> some IntentResult & OpensIntent {
+   print("WakeDeviceIntent performed for device: \(deviceName) (id: \(deviceId))")
+   let url = URL(string: "remotewol-upsnap://actions/wake/\(deviceId)")!
+   return .result(opensIntent: OpenURLIntent(url))
+ }
 }

@@ -1,5 +1,6 @@
 import { ContextMenu, Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
 import { Ionicons } from '@expo/vector-icons';
+import * as Burnt from 'burnt';
 import { SymbolView } from 'expo-symbols';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -15,8 +16,8 @@ import {
 } from 'react-native';
 import { useColorScheme } from '../../hooks/use-color-scheme';
 import api from '../../src/services/api';
+import { syncDevicesToWidget } from '../../src/services/widgetSync';
 import { Device } from '../../src/types';
-import * as Burnt from 'burnt';
 
 export default function DeviceListScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -36,6 +37,8 @@ export default function DeviceListScreen() {
       if (showLoading) setIsLoading(true);
       const data = await api.getDevices();
       setDevices(data);
+      // Sync devices to iOS widget
+      syncDevicesToWidget(data);
     } catch (error: any) {
       // For background/periodic refreshes, avoid interruptive alerts
       if (showLoading) {
@@ -272,29 +275,33 @@ export default function DeviceListScreen() {
     </TouchableOpacity>
   );
 
-  const renderDevice = ({ item }: { item: Device }) => (
-    <Host>
-      <ContextMenu activationMethod="longPress">
-        <ContextMenu.Items>
-          <SwiftUIButton
-            systemImage="trash"
-            role="destructive"
-            onPress={() => handleDelete(item)}
-          >
-            Delete Device
-          </SwiftUIButton>
-        </ContextMenu.Items>
-        <ContextMenu.Trigger>
-          <View
-            style={[
-              styles.deviceCard,
-              {
-                backgroundColor: cardBg,
-                shadowColor: isDark ? 'rgba(0,0,0,0.6)' : '#000',
-              },
-            ]}
-          >
-            <View>
+  const renderDevice = ({ item }: { item: Device }) => {
+    const isOnline = item.status?.toLowerCase() === 'online';
+    const isOffline = item.status?.toLowerCase() === 'offline';
+    const hasActions = isOnline || isOffline;
+
+    return (
+      <View
+        style={[
+          styles.deviceCard,
+          {
+            backgroundColor: cardBg,
+            shadowColor: isDark ? 'rgba(0,0,0,0.6)' : '#000',
+          },
+        ]}
+      >
+        <Host>
+          <ContextMenu activationMethod="longPress">
+            <ContextMenu.Items>
+              <SwiftUIButton
+                systemImage="trash"
+                role="destructive"
+                onPress={() => handleDelete(item)}
+              >
+                Delete Device
+              </SwiftUIButton>
+            </ContextMenu.Items>
+            <ContextMenu.Trigger>
               <View style={styles.deviceHeader}>
                 <View style={styles.deviceInfo}>
                   <Text style={[styles.deviceName, { color: textColor }]}>
@@ -330,49 +337,51 @@ export default function DeviceListScreen() {
                   ]}
                 />
               </View>
+            </ContextMenu.Trigger>
+          </ContextMenu>
+        </Host>
 
-              <View style={styles.deviceActions}>
-                {item.status?.toLowerCase() === 'offline' && (
-                  <ActionIcon
-                    name="Wake"
-                    symbolName="bolt.circle.fill"
-                    fallbackName="flash"
-                    color="#4CAF50"
-                    onPress={() => handleWake(item)}
-                  />
-                )}
-                {item.status?.toLowerCase() === 'online' && (
-                  <>
-                    <ActionIcon
-                      name="Sleep"
-                      symbolName="moon.circle.fill"
-                      fallbackName="moon"
-                      color="#FF9800"
-                      onPress={() => handleSleep(item)}
-                    />
-                    <ActionIcon
-                      name="Reboot"
-                      symbolName="arrow.clockwise.circle.fill"
-                      fallbackName="refresh"
-                      color="#2196F3"
-                      onPress={() => handleReboot(item)}
-                    />
-                    <ActionIcon
-                      name="Shutdown"
-                      symbolName="power.circle.fill"
-                      fallbackName="power"
-                      color="#f44336"
-                      onPress={() => handleShutdown(item)}
-                    />
-                  </>
-                )}
-              </View>
-            </View>
+        {hasActions && (
+          <View style={styles.deviceActions}>
+            {isOffline && (
+              <ActionIcon
+                name="Wake"
+                symbolName="bolt.circle.fill"
+                fallbackName="flash"
+                color="#4CAF50"
+                onPress={() => handleWake(item)}
+              />
+            )}
+            {isOnline && (
+              <>
+                <ActionIcon
+                  name="Sleep"
+                  symbolName="moon.circle.fill"
+                  fallbackName="moon"
+                  color="#FF9800"
+                  onPress={() => handleSleep(item)}
+                />
+                <ActionIcon
+                  name="Reboot"
+                  symbolName="arrow.clockwise.circle.fill"
+                  fallbackName="refresh"
+                  color="#2196F3"
+                  onPress={() => handleReboot(item)}
+                />
+                <ActionIcon
+                  name="Shutdown"
+                  symbolName="power.circle.fill"
+                  fallbackName="power"
+                  color="#f44336"
+                  onPress={() => handleShutdown(item)}
+                />
+              </>
+            )}
           </View>
-        </ContextMenu.Trigger>
-      </ContextMenu>
-    </Host>
-  );
+        )}
+      </View>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -389,9 +398,11 @@ export default function DeviceListScreen() {
         renderItem={renderDevice}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
+        contentInsetAdjustmentBehavior="automatic"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        ListFooterComponent={<View style={{ height: 20 }} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: subTextColor }]}>

@@ -5,14 +5,19 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "remotewol",
+    "scheme": "remotewol-upsnap",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "icon": "./assets/remotewol-ios.icon",
       "bundleIdentifier": "com.abunchofknowitalls.remotewol-upsnap",
-      "appleTeamId": "8S7C654DQ4"
+      "appleTeamId": "8S7C654DQ4",
+      "entitlements": {
+        "com.apple.security.application-groups": [
+          "group.abunchofknowitalls.remotewol-upsnap"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -38,6 +43,7 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff",
           "dark": {
+            "image": "./assets/images/splash-icon-dark.png",
             "backgroundColor": "#000000"
           }
         }
