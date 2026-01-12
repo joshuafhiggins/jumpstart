@@ -1,4 +1,8 @@
-import { ContextMenu, Host, Button as SwiftUIButton } from '@expo/ui/swift-ui';
+import {
+  ContextMenu,
+  Host,
+  Button as SwiftUIButton,
+} from '@expo/ui/swift-ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Burnt from 'burnt';
 import { SymbolView } from 'expo-symbols';
@@ -385,7 +389,7 @@ export default function DeviceListScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.loadingContainer, { backgroundColor: bgColor }]}>
         <ActivityIndicator size="large" color={activityColor} />
       </View>
     );
