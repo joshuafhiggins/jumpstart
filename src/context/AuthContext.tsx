@@ -21,7 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [serverAddress, setServerAddress] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [canCreate, setCanCreate] = useState<boolean>(false);
+  const [canCreate, setCanCreate] = useState<boolean | null>(null);
 
   useEffect(() => {
     loadAuth();
@@ -77,12 +77,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await AsyncStorage.removeItem('auth_token');
       await AsyncStorage.removeItem('auth_user');
+      await AsyncStorage.removeItem('auth_can_create');
       
       api.clearToken();
       api.clearAddress();
+      api.clearCanCreate();
       setToken(null);
       setUser(null);
       setServerAddress(null);
+      setCanCreate(null);
     } catch (error) {
       console.error('Failed to logout', error);
     }
@@ -96,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isAuthenticated: !!token && !!user,
         isLoading,
-        canCreate,
+        canCreate: canCreate === true,
         login,
         logout,
       }}

@@ -100,13 +100,17 @@ class UpSnapAPI {
 
     const userID = data.record.id;
     const userPermissionResponse = await fetch(
-      `${this.address}/collections/permissions/records/${userID}?expand=user,read,update,delete,power`,
+      `${this.address}/collections/permissions/records?filter=(user='${userID}')&expand=user,read,update,delete,power`,
       {
         headers: this.getHeaders(),
       }
     );
+    if (!userPermissionResponse.ok) {
+      const error = await userPermissionResponse.json();
+      throw new Error(error.message || 'Authentication failed');
+    }
 
-    const user: PermissionResponse = await userPermissionResponse.json();
+    const user: PermissionResponse = (await userPermissionResponse.json()).items[0];
     this.canCreate = user.create;
 
     return data;
