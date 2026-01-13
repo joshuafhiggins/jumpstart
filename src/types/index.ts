@@ -20,6 +20,20 @@ export interface AuthResponse {
 	record: User;
 }
 
+export interface PermissionResponse {
+  id: string;
+  collectionId: string;
+  collectionName: string;
+  user: User;
+  create: boolean;
+  read: Device[];
+  update: Device[];
+  delete: Device[];
+  power: Device[];
+  created: string;
+  updated: string;
+}
+
 export interface User {
 	id: string;
 	collectionId: string;

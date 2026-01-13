@@ -2,19 +2,21 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { Text, TouchableOpacity } from 'react-native';
 import { useColorScheme } from '../hooks/use-color-scheme';
-import { AuthProvider } from '../src/context/AuthContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 
 function DevicesHeader() {
   const router = useRouter();
   const isDark = useColorScheme() === 'dark';
   const activityColor = isDark ? '#0A84FF' : '#007AFF';
+  const { canCreate } = useAuth();
 
   return (
     <TouchableOpacity
       onPress={() => router.push('/scan-devices')}
+      disabled={!canCreate}
       style={{ paddingHorizontal: 8 }}
     >
-      <Ionicons name="add-circle-outline" size={24} color={activityColor} />
+      <Ionicons name="add-circle-outline" size={24} color={canCreate ? activityColor : 'gray'} />
     </TouchableOpacity>
   );
 }

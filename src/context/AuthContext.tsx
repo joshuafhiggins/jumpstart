@@ -9,6 +9,7 @@ interface AuthContextType {
   token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  canCreate: boolean;
   login: (serverAddress: string, identity: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -20,6 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [serverAddress, setServerAddress] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [canCreate, setCanCreate] = useState<boolean>(false);
 
   useEffect(() => {
     loadAuth();
@@ -30,6 +32,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const storedToken = await AsyncStorage.getItem('auth_token');
       const storedUser = await AsyncStorage.getItem('auth_user');
       const storedServerAddress = await AsyncStorage.getItem('auth_server_address');
+      const storedCanCreate = await AsyncStorage.getItem('auth_can_create');
+
+      if (storedCanCreate) {
+        setCanCreate(storedCanCreate === 'true');
+      }
       
       if (storedToken && storedUser) {
         setToken(storedToken);
@@ -55,10 +62,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await AsyncStorage.setItem('auth_token', response.token);
       await AsyncStorage.setItem('auth_user', JSON.stringify(response.record));
       await AsyncStorage.setItem('auth_server_address', serverAddress);
+      await AsyncStorage.setItem('auth_can_create', api.getCanCreate() ? 'true' : 'false');
       
       setToken(response.token);
       setUser(response.record);
       setServerAddress(serverAddress);
+      setCanCreate(api.getCanCreate() || false);
     } catch (error) {
       throw error;
     }
@@ -87,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         token,
         isAuthenticated: !!token && !!user,
         isLoading,
+        canCreate,
         login,
         logout,
       }}
