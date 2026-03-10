@@ -23,6 +23,12 @@ import api from '../../src/services/api';
 import { syncDevicesToWidget } from '../../src/services/widgetSync';
 import { Device } from '../../src/types';
 
+const isAuthError = (error: unknown) =>
+  typeof error === 'object' &&
+  error !== null &&
+  'isAuthError' in error &&
+  (error as { isAuthError?: boolean }).isAuthError === true;
+
 export default function DeviceListScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const isDark = colorScheme === 'dark';
@@ -44,6 +50,11 @@ export default function DeviceListScreen() {
       // Sync devices to iOS widget
       syncDevicesToWidget(data);
     } catch (error: any) {
+      if (isAuthError(error)) {
+        setDevices([]);
+        return;
+      }
+
       // For background/periodic refreshes, avoid interruptive alerts
       if (showLoading) {
         Alert.alert('Error', error.message || 'Failed to load devices');

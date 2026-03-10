@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../services/api';
 import { AuthResponse, User } from '../types';
@@ -26,6 +26,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     loadAuth();
   }, []);
+
+  const clearSession = useCallback(async () => {
+    await AsyncStorage.multiRemove(['auth_token', 'auth_user', 'auth_can_create']);
+
+    api.clearToken();
+    api.clearCanCreate();
+    setToken(null);
+    setUser(null);
+    setCanCreate(null);
+  }, []);
+
+  useEffect(() => {
+    api.setUnauthorizedHandler(clearSession);
+
+    return () => {
+      api.setUnauthorizedHandler(null);
+    };
+  }, [clearSession]);
 
   const loadAuth = async () => {
     try {
@@ -75,17 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     try {
-      await AsyncStorage.removeItem('auth_token');
-      await AsyncStorage.removeItem('auth_user');
-      await AsyncStorage.removeItem('auth_can_create');
-      
-      api.clearToken();
-      api.clearAddress();
-      api.clearCanCreate();
-      setToken(null);
-      setUser(null);
-      setServerAddress(null);
-      setCanCreate(null);
+      await clearSession();
     } catch (error) {
       console.error('Failed to logout', error);
     }

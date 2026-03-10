@@ -9,6 +9,8 @@ class UpSnapAPI {
   private token: string | null = null;
   private address: string | null = null;
   private canCreate: boolean | null = null;
+  private unauthorizedHandler: (() => Promise<void>) | null = null;
+  private isHandlingUnauthorized = false;
 
   setToken(token: string) {
     this.token = token;
@@ -44,6 +46,54 @@ class UpSnapAPI {
 
   clearCanCreate() {
     this.canCreate = null;
+  }
+
+  setUnauthorizedHandler(handler: (() => Promise<void>) | null) {
+    this.unauthorizedHandler = handler;
+  }
+
+  private async handleUnauthorized() {
+    if (!this.unauthorizedHandler || this.isHandlingUnauthorized) {
+      return;
+    }
+
+    this.isHandlingUnauthorized = true;
+
+    try {
+      await this.unauthorizedHandler();
+    } finally {
+      this.isHandlingUnauthorized = false;
+    }
+  }
+
+  private async throwApiError(response: Response, fallbackMessage: string): Promise<never> {
+    let message = fallbackMessage;
+
+    try {
+      const error = await response.json();
+      message = error.message || fallbackMessage;
+    } catch {
+      // Ignore JSON parsing errors and use the fallback message.
+    }
+
+    const isAuthError =
+      response.status === 401 ||
+      response.status === 403 ||
+      /authorization token|invalid token|unauthorized|not authenticated/i.test(message);
+
+    if (isAuthError) {
+      await this.handleUnauthorized();
+    }
+
+    const error = new Error(message) as Error & {
+      status?: number;
+      isAuthError?: boolean;
+    };
+
+    error.status = response.status;
+    error.isAuthError = isAuthError;
+
+    throw error;
   }
 
   private getHeaders(): HeadersInit {
@@ -85,8 +135,7 @@ class UpSnapAPI {
       );
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Authentication failed');
+        await this.throwApiError(response, 'Authentication failed');
       }
 
       const data: AuthResponse = await response.json();
@@ -106,8 +155,7 @@ class UpSnapAPI {
       }
     );
     if (!userPermissionResponse.ok) {
-      const error = await userPermissionResponse.json();
-      throw new Error(error.message || 'Authentication failed');
+      await this.throwApiError(userPermissionResponse, 'Authentication failed');
     }
 
     const user: PermissionResponse = (await userPermissionResponse.json()).items[0];
@@ -125,7 +173,7 @@ class UpSnapAPI {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch devices');
+      await this.throwApiError(response, 'Failed to fetch devices');
     }
 
     const data = await response.json();
@@ -141,7 +189,7 @@ class UpSnapAPI {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to fetch device');
+      await this.throwApiError(response, 'Failed to fetch device');
     }
 
     return response.json();
@@ -158,8 +206,7 @@ class UpSnapAPI {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to create device');
+      await this.throwApiError(response, 'Failed to create device');
     }
 
     return response.json();
@@ -176,8 +223,7 @@ class UpSnapAPI {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Failed to update device');
+      await this.throwApiError(response, 'Failed to update device');
     }
 
     return response.json();
@@ -193,7 +239,7 @@ class UpSnapAPI {
     );
 
     if (!response.ok) {
-      throw new Error('Failed to delete device');
+      await this.throwApiError(response, 'Failed to delete device');
     }
   }
 
@@ -203,7 +249,7 @@ class UpSnapAPI {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to wake device');
+      await this.throwApiError(response, 'Failed to wake device');
     }
   }
 
@@ -213,7 +259,7 @@ class UpSnapAPI {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to wake group');
+      await this.throwApiError(response, 'Failed to wake group');
     }
   }
 
@@ -223,7 +269,7 @@ class UpSnapAPI {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to sleep device');
+      await this.throwApiError(response, 'Failed to sleep device');
     }
   }
 
@@ -233,7 +279,7 @@ class UpSnapAPI {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to reboot device');
+      await this.throwApiError(response, 'Failed to reboot device');
     }
   }
 
@@ -243,7 +289,7 @@ class UpSnapAPI {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to shutdown device');
+      await this.throwApiError(response, 'Failed to shutdown device');
     }
   }
 
@@ -253,7 +299,7 @@ class UpSnapAPI {
     });
 
     if (!response.ok) {
-      throw new Error('Failed to scan network');
+      await this.throwApiError(response, 'Failed to scan network');
     }
 
     const data = await response.json();

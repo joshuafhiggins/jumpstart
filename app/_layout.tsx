@@ -1,8 +1,33 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { useEffect } from 'react';
 import { Text, TouchableOpacity } from 'react-native';
 import { useColorScheme } from '../hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
+
+function AuthRedirect() {
+  const { isAuthenticated, isLoading } = useAuth();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    if (isLoading) {
+      return;
+    }
+
+    const isLoginRoute = segments[0] === 'login';
+
+    if (!isAuthenticated && !isLoginRoute) {
+      router.replace('/login');
+    }
+
+    if (isAuthenticated && isLoginRoute) {
+      router.replace('/(tabs)');
+    }
+  }, [isAuthenticated, isLoading, router, segments]);
+
+  return null;
+}
 
 function DevicesHeader() {
   const router = useRouter();
@@ -45,6 +70,7 @@ export default function RootLayout() {
 
   return (
     <AuthProvider>
+      <AuthRedirect />
       <Stack>
         {/* Root index that performs auth redirect (app/index.tsx) */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
