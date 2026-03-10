@@ -1,7 +1,7 @@
 import {
+  Button,
   ContextMenu,
   Host,
-  Button as SwiftUIButton,
 } from '@expo/ui/swift-ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Burnt from 'burnt';
@@ -306,15 +306,14 @@ export default function DeviceListScreen() {
         ]}
       >
         <Host>
-          <ContextMenu activationMethod="longPress">
+          <ContextMenu>
             <ContextMenu.Items>
-              <SwiftUIButton
+              <Button
                 systemImage="trash"
                 role="destructive"
+                label='Delete Device'
                 onPress={() => handleDelete(item)}
-              >
-                Delete Device
-              </SwiftUIButton>
+              />
             </ContextMenu.Items>
             <ContextMenu.Trigger>
               <View style={styles.deviceHeader}>
