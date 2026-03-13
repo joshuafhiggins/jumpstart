@@ -14,8 +14,12 @@
       "appleTeamId": "8S7C654DQ4",
       "entitlements": {
         "com.apple.security.application-groups": [
+          "group.abunchofknowitalls.remotewol-upsnap",
           "group.abunchofknowitalls.remotewol-upsnap"
         ]
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -54,6 +58,29 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.abunchofknowitalls.remotewol-upsnap.widget",
+                  "targetName": "widget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.abunchofknowitalls.remotewol-upsnap"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "b2c99399-8470-4a78-9253-492056fc1c35"
+      }
     }
   }
 }
