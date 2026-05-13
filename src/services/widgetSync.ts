@@ -13,6 +13,8 @@ interface WidgetDevice {
   name: string;
   mac: string;
   ip: string;
+  canSleep: boolean;
+  canShutdown: boolean;
   status: string;
 }
 
@@ -32,6 +34,8 @@ export function syncDevicesToWidget(devices: Device[]): void {
       name: device.name,
       mac: device.mac,
       ip: device.ip,
+      canSleep: device.sol_enabled,
+      canShutdown: device.shutdown_cmd !== "",
       status: device.status || 'unknown',
     }));
 

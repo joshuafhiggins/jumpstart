@@ -16,7 +16,7 @@ struct Provider: AppIntentTimelineProvider {
         DeviceEntry(
             date: Date(),
             configuration: ConfigurationAppIntent(),
-            device: DeviceInfo(id: "placeholder", name: "My Computer", mac: "AA:BB:CC:DD:EE:FF", ip: "192.168.1.100", status: "unknown")
+            device: DeviceInfo(id: "placeholder", name: "My Computer", mac: "AA:BB:CC:DD:EE:FF", ip: "192.168.1.100", canSleep: true, canShutdown: true, status: "unknown")
         )
     }
 
@@ -76,21 +76,21 @@ struct DeviceWidgetEntryView: View {
                     // Small widget: 2x2 grid
                     VStack(spacing: 6) {
                         HStack(spacing: 6) {
-                            ActionButton(action: .wake, deviceId: device.id)
-                            ActionButton(action: .sleep, deviceId: device.id)
+                            ActionButton(action: .wake, deviceId: device.id, enabled: device.status == "offline")
+                            ActionButton(action: .sleep, deviceId: device.id, enabled: device.status == "online" && device.canSleep)
                         }
                         HStack(spacing: 6) {
-                            ActionButton(action: .restart, deviceId: device.id)
-                            ActionButton(action: .shutdown, deviceId: device.id)
+                            ActionButton(action: .restart, deviceId: device.id, enabled: device.status == "online" && device.canShutdown)
+                            ActionButton(action: .shutdown, deviceId: device.id, enabled: device.status == "online" && device.canShutdown)
                         }
                     }
                 } else {
                     // Medium/Large widget: horizontal layout
                     HStack(spacing: 8) {
-                        ActionButton(action: .wake, deviceId: device.id)
-                        ActionButton(action: .sleep, deviceId: device.id)
-                        ActionButton(action: .restart, deviceId: device.id)
-                        ActionButton(action: .shutdown, deviceId: device.id)
+                        ActionButton(action: .wake, deviceId: device.id, enabled: device.status == "offline")
+                        ActionButton(action: .sleep, deviceId: device.id, enabled: device.status == "online" && device.canSleep)
+                        ActionButton(action: .restart, deviceId: device.id, enabled: device.status == "online" && device.canShutdown)
+                        ActionButton(action: .shutdown, deviceId: device.id, enabled: device.status == "online" && device.canShutdown)
                     }
                 }
             }
@@ -118,6 +118,7 @@ struct DeviceWidgetEntryView: View {
 struct ActionButton: View {
     let action: DeviceAction
     let deviceId: String
+    let enabled: Bool
     
     var icon: String {
         switch action {
@@ -136,6 +137,10 @@ struct ActionButton: View {
         case .shutdown: return .red
         }
     }
+
+    var disabled: Color {
+      return .gray
+    }
     
     var label: String {
         switch action {
@@ -147,15 +152,16 @@ struct ActionButton: View {
     }
     
     var body: some View {
-        Link(destination: action.url(for: deviceId)) {
+        Link(destination: enabled ? action.url(for: deviceId) : URL("")!) {
             VStack(spacing: 2) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(color)
+                    .foregroundColor(enabled ? color : disabled)
             }
             .frame(maxWidth: .infinity, minHeight: 36)
-            .background(color.opacity(0.15))
+            .background((enabled ? color : disabled).opacity(0.15))
             .cornerRadius(8)
+            .disabled(!enabled)
         }
     }
 }
@@ -187,7 +193,7 @@ typealias widget = DeviceControlWidget
     DeviceEntry(
         date: .now,
         configuration: ConfigurationAppIntent(),
-        device: DeviceInfo(id: "preview", name: "Gaming PC", mac: "AA:BB:CC:DD:EE:FF", ip: "192.168.1.100", status: "online")
+        device: DeviceInfo(id: "preview", name: "Gaming PC", mac: "AA:BB:CC:DD:EE:FF", ip: "192.168.1.100", canSleep: true, canShutdown: true, status: "online")
     )
 }
 
@@ -197,6 +203,6 @@ typealias widget = DeviceControlWidget
     DeviceEntry(
         date: .now,
         configuration: ConfigurationAppIntent(),
-        device: DeviceInfo(id: "preview", name: "Home Server", mac: "11:22:33:44:55:66", ip: "192.168.1.50", status: "offline")
+        device: DeviceInfo(id: "preview", name: "Home Server", mac: "11:22:33:44:55:66", ip: "192.168.1.50", canSleep: true, canShutdown: true, status: "offline")
     )
 }

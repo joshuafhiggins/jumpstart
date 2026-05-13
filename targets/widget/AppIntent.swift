@@ -32,6 +32,8 @@ struct DeviceInfo: Codable, Hashable, Identifiable {
     let name: String
     let mac: String
     let ip: String
+    let canSleep: Bool
+    let canShutdown: Bool
     let status: String
 }
 

@@ -20,11 +20,11 @@ export default function ActionHandler() {
       executeAction(action as DeviceAction, deviceId);
     }
 
-    // Reset navigation to tabs - clears entire stack so no back button
+    // Reset navigation to devices - clears entire stack so no back button
     navigation.dispatch(
       CommonActions.reset({
         index: 0,
-        routes: [{ name: '(tabs)' }],
+        routes: [{ name: 'devices' }],
       })
     );
   }, [action, deviceId, navigation]);

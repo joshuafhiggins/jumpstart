@@ -155,7 +155,8 @@ export default function ScanDevicesScreen() {
 
 			<Text style={[styles.infoText, { color: subText }]}>
 				Note: This requires the server to have nmap installed and may take
-				several minutes.
+        several minutes. To allow for shutdown, reboot, and sleep actions,
+        please configure their respective commands in your UpSnap server.
 			</Text>
 
 			{devices.length > 0 && (

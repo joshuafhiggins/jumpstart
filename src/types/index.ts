@@ -7,8 +7,10 @@ export interface Device {
 	ip: string;
 	netmask: string;
 	broadcast: string;
-	secureOnPassword: string;
-	port: number;
+  password: string;
+  shutdown_cmd: string;
+  sol_enabled: boolean;
+	ports: number[];
 	groups: string[];
 	status: string;
 	created: string;

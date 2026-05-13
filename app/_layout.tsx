@@ -1,62 +1,29 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Stack, useRouter, useSegments } from 'expo-router';
-import { useEffect } from 'react';
-import { Text, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
 import { useColorScheme } from '../hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 
 function AuthRedirect() {
-  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  const { isAuthenticated, isLoading } = useAuth();
+  const firstSegment = segments[0];
 
   useEffect(() => {
     if (isLoading) {
       return;
     }
 
-    const isLoginRoute = segments[0] === 'login';
+    const isLoginRoute = firstSegment === 'login';
 
     if (!isAuthenticated && !isLoginRoute) {
       router.replace('/login');
+    } else if (isAuthenticated && isLoginRoute) {
+      router.replace('/devices');
     }
-
-    if (isAuthenticated && isLoginRoute) {
-      router.replace('/(tabs)');
-    }
-  }, [isAuthenticated, isLoading, router, segments]);
+  }, [firstSegment, isAuthenticated, isLoading, router]);
 
   return null;
-}
-
-function DevicesHeader() {
-  const router = useRouter();
-  const isDark = useColorScheme() === 'dark';
-  const activityColor = isDark ? '#0A84FF' : '#007AFF';
-  const { canCreate } = useAuth();
-
-  return (
-    <TouchableOpacity
-      onPress={() => router.push('/scan-devices')}
-      disabled={!canCreate}
-      style={{ paddingHorizontal: 8 }}
-    >
-      <Ionicons name="add-circle-outline" size={24} color={canCreate ? activityColor : 'gray'} />
-    </TouchableOpacity>
-  );
-}
-
-function TabsTitle(props: { title: string }) {
-  const segments = useSegments();
-  const last = segments[segments.length - 1];
-  const isDark = useColorScheme() === 'dark';
-  const titleColor = isDark ? '#fff' : '#000';
-  const title = last === 'settings' ? 'Settings' : props.title;
-  return (
-    <Text style={{ color: titleColor, fontSize: 17, fontWeight: '600' }}>
-      {title}
-    </Text>
-  );
 }
 
 export default function RootLayout() {
@@ -64,45 +31,26 @@ export default function RootLayout() {
   const bgColor = isDark ? '#0b0b0d' : '#fff';
   const titleColor = isDark ? '#fff' : '#000';
 
-  const segments = useSegments();
-  const last = segments[segments.length - 1];
-  const isIndex = last === '(tabs)' || last === undefined;
-
   return (
     <AuthProvider>
       <AuthRedirect />
-      <Stack>
-        {/* Root index that performs auth redirect (app/index.tsx) */}
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        {/* Tabs parent - render tabs with dynamic header */}
-        <Stack.Screen
-          name="(tabs)"
-          options={
-            {
-              headerTitle: () => <TabsTitle title="Devices" />,
-              headerRight: isIndex ? () => <DevicesHeader /> : undefined,
-              headerRightContainerStyle: isIndex
-                ? undefined
-                : { width: 0, paddingRight: 0 },
-              headerStyle: { backgroundColor: bgColor },
-              headerTintColor: titleColor,
-            } as any
-          }
-        />{' '}
-        <Stack.Screen name="login" options={{ headerShown: false }} />
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="login" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen
           name="scan-devices"
           options={{
             headerShown: true,
-            headerTitle: () => <TabsTitle title="Scan Devices" />,
+            title: 'Scan for Devices',
             headerStyle: { backgroundColor: bgColor },
+            headerTintColor: titleColor,
             headerBackButtonDisplayMode: 'minimal',
           }}
         />
-        {/* Deep link action handler - no header, immediately redirects */}
         <Stack.Screen
           name="action/[action]/[deviceId]"
-          options={{ headerShown: false, animation: 'none' }}
+          options={{ animation: 'none' }}
         />
       </Stack>
     </AuthProvider>

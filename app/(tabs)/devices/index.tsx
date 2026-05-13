@@ -1,8 +1,4 @@
-import {
-  Button,
-  ContextMenu,
-  Host,
-} from '@expo/ui/swift-ui';
+import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Burnt from 'burnt';
 import { SymbolView } from 'expo-symbols';
@@ -18,10 +14,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useColorScheme } from '../../hooks/use-color-scheme';
-import api from '../../src/services/api';
-import { syncDevicesToWidget } from '../../src/services/widgetSync';
-import { Device } from '../../src/types';
+import { useColorScheme } from '../../../hooks/use-color-scheme';
+import api from '../../../src/services/api';
+import { syncDevicesToWidget } from '../../../src/services/widgetSync';
+import { Device } from '../../../src/types';
+import { useAuth } from '@/src/context/AuthContext';
 
 const isAuthError = (error: unknown) =>
   typeof error === 'object' &&
@@ -41,6 +38,8 @@ export default function DeviceListScreen() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const { isAuthenticated } = useAuth();
 
   const fetchDevices = useCallback(async (showLoading = false) => {
     try {
@@ -65,10 +64,14 @@ export default function DeviceListScreen() {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     fetchDevices(true);
-  }, [fetchDevices]);
+  }, [fetchDevices, isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     let intervalId: number | null = null;
 
     const startPolling = () => {
@@ -102,7 +105,7 @@ export default function DeviceListScreen() {
       stopPolling();
       subscription.remove();
     };
-  }, [fetchDevices]);
+  }, [fetchDevices, isAuthenticated]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -259,17 +262,20 @@ export default function DeviceListScreen() {
     symbolName,
     color,
     onPress,
+    enabled,
     fallbackName,
   }: {
     name: string;
     symbolName: string;
     color: string;
     onPress: () => void;
+    enabled: boolean;
     fallbackName?: string;
   }) => (
     <TouchableOpacity
       style={styles.actionIconContainer}
       onPress={onPress}
+      disabled={!enabled}
       accessibilityLabel={name}
       activeOpacity={0.75}
     >
@@ -293,29 +299,28 @@ export default function DeviceListScreen() {
   const renderDevice = ({ item }: { item: Device }) => {
     const isOnline = item.status?.toLowerCase() === 'online';
     const isOffline = item.status?.toLowerCase() === 'offline';
-    const hasActions = isOnline || isOffline;
-
+    
     return (
-      <View
-        style={[
-          styles.deviceCard,
-          {
-            backgroundColor: cardBg,
-            shadowColor: isDark ? 'rgba(0,0,0,0.6)' : '#000',
-          },
-        ]}
-      >
-        <Host>
-          <ContextMenu>
-            <ContextMenu.Items>
-              <Button
-                systemImage="trash"
-                role="destructive"
-                label='Delete Device'
-                onPress={() => handleDelete(item)}
-              />
-            </ContextMenu.Items>
-            <ContextMenu.Trigger>
+      <Host>
+        <ContextMenu>
+          <ContextMenu.Items>
+            <Button
+              systemImage="trash"
+              role="destructive"
+              label="Delete Device"
+              onPress={() => handleDelete(item)}
+            />
+          </ContextMenu.Items>
+          <ContextMenu.Trigger>
+            <View
+              style={[
+                styles.deviceCard,
+                {
+                  backgroundColor: cardBg,
+                  shadowColor: isDark ? 'rgba(0,0,0,0.6)' : '#000',
+                },
+              ]}
+            >
               <View style={styles.deviceHeader}>
                 <View style={styles.deviceInfo}>
                   <Text style={[styles.deviceName, { color: textColor }]}>
@@ -351,49 +356,45 @@ export default function DeviceListScreen() {
                   ]}
                 />
               </View>
-            </ContextMenu.Trigger>
-          </ContextMenu>
-        </Host>
 
-        {hasActions && (
-          <View style={styles.deviceActions}>
-            {isOffline && (
-              <ActionIcon
-                name="Wake"
-                symbolName="bolt.circle.fill"
-                fallbackName="flash"
-                color="#4CAF50"
-                onPress={() => handleWake(item)}
-              />
-            )}
-            {isOnline && (
-              <>
+              <View style={styles.deviceActions}>
+                <ActionIcon
+                  name="Wake"
+                  enabled={isOffline}
+                  symbolName="bolt.circle.fill"
+                  fallbackName="flash"
+                  color={isOffline ? '#4CAF50' : subTextColor}
+                  onPress={() => handleWake(item)}
+                />
                 <ActionIcon
                   name="Sleep"
+                  enabled={isOnline && item.sol_enabled}
                   symbolName="moon.circle.fill"
                   fallbackName="moon"
-                  color="#FF9800"
+                  color={isOnline && item.sol_enabled ? '#FF9800' : subTextColor}
                   onPress={() => handleSleep(item)}
                 />
                 <ActionIcon
                   name="Reboot"
+                  enabled={isOnline && item.shutdown_cmd !== "" }
                   symbolName="arrow.clockwise.circle.fill"
                   fallbackName="refresh"
-                  color="#2196F3"
+                  color={isOnline && item.shutdown_cmd !== "" ? '#2196F3' : subTextColor}
                   onPress={() => handleReboot(item)}
                 />
                 <ActionIcon
                   name="Shutdown"
+                  enabled={isOnline && item.shutdown_cmd !== "" }
                   symbolName="power.circle.fill"
                   fallbackName="power"
-                  color="#f44336"
+                  color={isOnline && item.shutdown_cmd !== "" ? '#f44336' : subTextColor}
                   onPress={() => handleShutdown(item)}
                 />
-              </>
-            )}
-          </View>
-        )}
-      </View>
+              </View>
+            </View>
+          </ContextMenu.Trigger>
+        </ContextMenu>
+      </Host>
     );
   };
 
@@ -406,26 +407,28 @@ export default function DeviceListScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: bgColor }]}>
-      <FlatList
-        data={devices}
-        renderItem={renderDevice}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.list}
-        contentInsetAdjustmentBehavior="automatic"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListFooterComponent={<View style={{ height: 20 }} />}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={[styles.emptyText, { color: subTextColor }]}>
-              No devices found
-            </Text>
-          </View>
-        }
-      />
-    </View>
+    <FlatList
+      style={[styles.container, { backgroundColor: bgColor }]}
+      data={devices}
+      renderItem={renderDevice}
+      keyExtractor={item => item.id}
+      contentContainerStyle={styles.list}
+      contentInsetAdjustmentBehavior="automatic"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={isDark ? subTextColor : undefined}
+        />
+      }
+      ListEmptyComponent={
+        <View style={styles.emptyContainer}>
+          <Text style={[styles.emptyText, { color: subTextColor }]}>
+            No devices found
+          </Text>
+        </View>
+      }
+    />
   );
 }
 

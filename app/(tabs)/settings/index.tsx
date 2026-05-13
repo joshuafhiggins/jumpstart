@@ -7,8 +7,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useColorScheme } from '../../hooks/use-color-scheme';
-import { useAuth } from '../../src/context/AuthContext';
+import { useColorScheme } from '../../../hooks/use-color-scheme';
+import { useAuth } from '../../../src/context/AuthContext';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 
@@ -90,7 +90,7 @@ export default function SettingsScreen() {
   );
 
   return (
-    <ScrollView style={[styles.container, { backgroundColor: bgColor }]}>
+    <ScrollView style={[styles.container, { backgroundColor: bgColor }]} contentInsetAdjustmentBehavior='automatic'>
       <View style={styles.content}>
         <View
           style={[
@@ -109,8 +109,7 @@ export default function SettingsScreen() {
           >
             Information
           </Text>
-          <SettingItem label="Username" value={user?.username || 'Admin'} />
-          <SettingItem label="Email" value={user?.email || 'N/A'} />
+          <SettingItem label={user?.email ? 'Email' : 'Username'} value={user?.email || user?.username} />
           <SettingItem label="Server URL" value={serverAddress || 'N/A'} />
           <SettingItem label="App Version" value={`${Constants.expoConfig?.version}`} />
         </View>
@@ -137,7 +136,7 @@ export default function SettingsScreen() {
 
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: subTextColor }]}>
-            UpSnap Mobile App
+            Jumpstart
           </Text>
           <Text style={[styles.footerText, { color: subTextColor }]}>
             Connect to your UpSnap server

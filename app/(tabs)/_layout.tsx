@@ -1,10 +1,9 @@
 import { NativeTabs } from 'expo-router/unstable-native-tabs';
-import React from 'react';
 
-export default function TabsLayout() {
+export default function TabLayout() {
   return (
     <NativeTabs>
-      <NativeTabs.Trigger name="index">
+      <NativeTabs.Trigger name="devices">
         <NativeTabs.Trigger.Icon sf="desktopcomputer" md="home" />
         <NativeTabs.Trigger.Label>Devices</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
