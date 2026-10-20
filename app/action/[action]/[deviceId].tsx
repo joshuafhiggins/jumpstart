@@ -1,6 +1,6 @@
-import { CommonActions, useNavigation } from '@react-navigation/native';
 import * as Burnt from 'burnt';
-import { Redirect, useLocalSearchParams } from 'expo-router';
+import { Redirect, useLocalSearchParams, useNavigation } from 'expo-router';
+import { CommonActions } from 'expo-router/react-navigation';
 import { useEffect, useRef } from 'react';
 import api from '../../../src/services/api';
 

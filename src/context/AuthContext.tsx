@@ -23,10 +23,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
   const [canCreate, setCanCreate] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    loadAuth();
-  }, []);
-
   const clearSession = useCallback(async () => {
     await AsyncStorage.multiRemove(['auth_token', 'auth_user', 'auth_can_create']);
 
@@ -45,33 +41,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [clearSession]);
 
-  const loadAuth = async () => {
-    try {
-      const storedToken = await AsyncStorage.getItem('auth_token');
-      const storedUser = await AsyncStorage.getItem('auth_user');
-      const storedServerAddress = await AsyncStorage.getItem('auth_server_address');
-      const storedCanCreate = await AsyncStorage.getItem('auth_can_create');
+  useEffect(() => {
+    let cancelled = false;
 
-      if (storedCanCreate) {
-        setCanCreate(storedCanCreate === 'true');
-      }
-      
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        api.setToken(storedToken);
-        setUser(JSON.parse(storedUser));
-      }
+    void AsyncStorage.multiGet([
+      'auth_token',
+      'auth_user',
+      'auth_server_address',
+      'auth_can_create',
+    ]).then(
+      ([[, storedToken], [, storedUser], [, storedServerAddress], [, storedCanCreate]]) => {
+        if (cancelled) return;
 
-      if (storedServerAddress) {
-        setServerAddress(storedServerAddress);
-        api.setAddress(storedServerAddress + '/api');
+        if (storedCanCreate) {
+          setCanCreate(storedCanCreate === 'true');
+        }
+
+        if (storedToken && storedUser) {
+          setToken(storedToken);
+          api.setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        }
+
+        if (storedServerAddress) {
+          setServerAddress(storedServerAddress);
+          api.setAddress(storedServerAddress + '/api');
+        }
+
+        setIsLoading(false);
+      },
+      error => {
+        if (cancelled) return;
+        console.error('Failed to load auth', error);
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to load auth', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = async (serverAddress: string, identity: string, password: string) => {
     try {

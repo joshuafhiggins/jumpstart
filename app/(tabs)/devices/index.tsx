@@ -1,4 +1,3 @@
-import { Button, ContextMenu, Host } from '@expo/ui/swift-ui';
 import { Ionicons } from '@expo/vector-icons';
 import * as Burnt from 'burnt';
 import { SymbolView } from 'expo-symbols';
@@ -19,6 +18,7 @@ import api from '../../../src/services/api';
 import { syncDevicesToWidget } from '../../../src/services/widgetSync';
 import { Device } from '../../../src/types';
 import { useAuth } from '@/src/context/AuthContext';
+import { DeviceContextMenu } from '@/src/components/DeviceContextMenu';
 
 const isAuthError = (error: unknown) =>
   typeof error === 'object' &&
@@ -43,7 +43,6 @@ export default function DeviceListScreen() {
 
   const fetchDevices = useCallback(async (showLoading = false) => {
     try {
-      if (showLoading) setIsLoading(true);
       const data = await api.getDevices();
       setDevices(data);
       // Sync devices to iOS widget
@@ -66,8 +65,31 @@ export default function DeviceListScreen() {
   useEffect(() => {
     if (!isAuthenticated) return;
 
-    fetchDevices(true);
-  }, [fetchDevices, isAuthenticated]);
+    let cancelled = false;
+    void api.getDevices().then(
+      data => {
+        if (cancelled) return;
+        setDevices(data);
+        syncDevicesToWidget(data);
+        setIsLoading(false);
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        if (isAuthError(error)) {
+          setDevices([]);
+        } else {
+          const message =
+            error instanceof Error ? error.message : 'Failed to load devices';
+          Alert.alert('Error', message);
+        }
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -301,17 +323,7 @@ export default function DeviceListScreen() {
     const isOffline = item.status?.toLowerCase() === 'offline';
     
     return (
-      <Host>
-        <ContextMenu>
-          <ContextMenu.Items>
-            <Button
-              systemImage="trash"
-              role="destructive"
-              label="Delete Device"
-              onPress={() => handleDelete(item)}
-            />
-          </ContextMenu.Items>
-          <ContextMenu.Trigger>
+      <DeviceContextMenu onDelete={() => handleDelete(item)}>
             <View
               style={[
                 styles.deviceCard,
@@ -392,9 +404,7 @@ export default function DeviceListScreen() {
                 />
               </View>
             </View>
-          </ContextMenu.Trigger>
-        </ContextMenu>
-      </Host>
+      </DeviceContextMenu>
     );
   };
 
