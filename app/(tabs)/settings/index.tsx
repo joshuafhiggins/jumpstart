@@ -12,6 +12,60 @@ import { useAuth } from '../../../src/context/AuthContext';
 import { useRouter } from 'expo-router';
 import Constants from 'expo-constants';
 
+function SettingItem({
+  label,
+  value,
+  onPress,
+  textColor,
+  subTextColor,
+  borderBottomColor,
+}: {
+  label: string;
+  value?: string;
+  onPress?: () => void;
+  textColor: string;
+  subTextColor: string;
+  borderBottomColor: string;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.settingItem, { borderBottomColor }]}
+      onPress={onPress}
+      disabled={!onPress}
+      activeOpacity={onPress ? 0.7 : 1}
+    >
+      <Text style={[styles.settingLabel, { color: textColor }]}>{label}</Text>
+      <View style={styles.settingValueContainer}>
+        <Text
+          style={[styles.settingValue, { color: subTextColor }]}
+          numberOfLines={1}
+        >
+          {value}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function ActionButton({
+  title,
+  onPress,
+  backgroundColor,
+}: {
+  title: string;
+  onPress: () => void;
+  backgroundColor: string;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.actionButton, { backgroundColor }]}
+      onPress={onPress}
+    >
+      <Text style={styles.actionButtonText}>{title}</Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function SettingsScreen() {
   const { user, serverAddress, logout } = useAuth();
   const router = useRouter();
@@ -22,7 +76,6 @@ export default function SettingsScreen() {
   const sectionTitleBg = isDark ? '#111111' : '#f9f9f9';
   const textColor = isDark ? '#fff' : '#333';
   const subTextColor = isDark ? '#c6c6c8' : '#666';
-  const primary = isDark ? '#0A84FF' : '#007AFF';
   const destructiveColor = '#f44336';
 
   const handleLogout = () => {
@@ -39,55 +92,7 @@ export default function SettingsScreen() {
     ]);
   };
 
-  const SettingItem = ({
-    label,
-    value,
-    onPress,
-  }: {
-    label: string;
-    value?: string;
-    onPress?: () => void;
-  }) => (
-    <TouchableOpacity
-      style={[
-        styles.settingItem,
-        { borderBottomColor: isDark ? 'rgba(255,255,255,0.03)' : '#f0f0f0' },
-      ]}
-      onPress={onPress}
-      disabled={!onPress}
-      activeOpacity={onPress ? 0.7 : 1}
-    >
-      <Text style={[styles.settingLabel, { color: textColor }]}>{label}</Text>
-      <View style={styles.settingValueContainer}>
-        <Text
-          style={[styles.settingValue, { color: subTextColor }]}
-          numberOfLines={1}
-        >
-          {value}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  const ActionButton = ({
-    title,
-    onPress,
-    destructive = false,
-  }: {
-    title: string;
-    onPress: () => void;
-    destructive?: boolean;
-  }) => (
-    <TouchableOpacity
-      style={[
-        styles.actionButton,
-        { backgroundColor: destructive ? destructiveColor : primary },
-      ]}
-      onPress={onPress}
-    >
-      <Text style={styles.actionButtonText}>{title}</Text>
-    </TouchableOpacity>
-  );
+  const borderBottomColor = isDark ? 'rgba(255,255,255,0.03)' : '#f0f0f0';
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: bgColor }]} contentInsetAdjustmentBehavior='automatic'>
@@ -109,9 +114,27 @@ export default function SettingsScreen() {
           >
             Information
           </Text>
-          <SettingItem label={user?.email ? 'Email' : 'Username'} value={user?.email || user?.username} />
-          <SettingItem label="Server URL" value={serverAddress || 'N/A'} />
-          <SettingItem label="App Version" value={`${Constants.expoConfig?.version}`} />
+          <SettingItem
+            label={user?.email ? 'Email' : 'Username'}
+            value={user?.email || user?.username}
+            textColor={textColor}
+            subTextColor={subTextColor}
+            borderBottomColor={borderBottomColor}
+          />
+          <SettingItem
+            label="Server URL"
+            value={serverAddress || 'N/A'}
+            textColor={textColor}
+            subTextColor={subTextColor}
+            borderBottomColor={borderBottomColor}
+          />
+          <SettingItem
+            label="App Version"
+            value={`${Constants.expoConfig?.version}`}
+            textColor={textColor}
+            subTextColor={subTextColor}
+            borderBottomColor={borderBottomColor}
+          />
         </View>
 
         <View
@@ -131,7 +154,11 @@ export default function SettingsScreen() {
           >
             Actions
           </Text>
-          <ActionButton title="Logout" onPress={handleLogout} destructive />
+          <ActionButton
+            title="Logout"
+            onPress={handleLogout}
+            backgroundColor={destructiveColor}
+          />
         </View>
 
         <View style={styles.footer}>

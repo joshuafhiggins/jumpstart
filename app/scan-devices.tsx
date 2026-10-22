@@ -56,8 +56,8 @@ export default function ScanDevicesScreen() {
 				ip: deviceIP,
 				netmask: "255.255.255.0",
 				broadcast: "",
-				secureOnPassword: "",
-				port: 9,
+				password: "",
+				ports: [9],
 				groups: [],
 				status: "offline",
 			});
