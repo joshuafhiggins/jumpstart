@@ -14,7 +14,6 @@
       "appleTeamId": "8S7C654DQ4",
       "entitlements": {
         "com.apple.security.application-groups": [
-          "group.abunchofknowitalls.remotewol-upsnap",
           "group.abunchofknowitalls.remotewol-upsnap"
         ]
       },
@@ -50,35 +49,60 @@
           }
         }
       ],
-      "@bacons/apple-targets",
+      "./plugins/withWakeControl.js",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.abunchofknowitalls.remotewol-upsnap.widget",
+          "groupIdentifier": "group.abunchofknowitalls.remotewol-upsnap",
+          "widgets": [
+            {
+              "name": "DeviceControl",
+              "displayName": "Device Control",
+              "description": "Control your devices with wake, sleep, restart, and shutdown actions.",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium"],
+                "initialLayout": "./src/widgets/DeviceControl.tsx",
+                "configuration": {
+                  "title": "Device Control",
+                  "description": "Select a device to control from your home screen.",
+                  "parameters": {
+                    "device": {
+                      "title": "Device",
+                      "type": "enum",
+                      "default": "none",
+                      "dynamic": true,
+                      "values": [
+                        {
+                          "name": "Select a Device",
+                          "value": "none"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
       "expo-font",
       "expo-image",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-app-intents"
     ],
     "experiments": {
       "typedRoutes": true,
-      "reactCompiler": true
+      "reactCompiler": true,
+      "inlineModules": {
+        "watchedDirectories": [
+          "app-intents"
+        ]
+      }
     },
     "extra": {
       "router": {},
       "eas": {
-        "build": {
-          "experimental": {
-            "ios": {
-              "appExtensions": [
-                {
-                  "bundleIdentifier": "com.abunchofknowitalls.remotewol-upsnap.widget",
-                  "targetName": "widget",
-                  "entitlements": {
-                    "com.apple.security.application-groups": [
-                      "group.abunchofknowitalls.remotewol-upsnap"
-                    ]
-                  }
-                }
-              ]
-            }
-          }
-        },
         "projectId": "b2c99399-8470-4a78-9253-492056fc1c35"
       }
     }

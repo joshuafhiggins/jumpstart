@@ -1,64 +1,115 @@
-import { ExtensionStorage } from '@bacons/apple-targets';
+import { setEntityCatalogAsync, isAvailable as appIntentsAvailable } from 'expo-app-intents';
+import type { AppIntentEntity } from 'expo-app-intents';
 import { Platform } from 'react-native';
 import { Device } from '../types';
+import DeviceControlWidget, { type WidgetDevice } from '../widgets/DeviceControl';
 
-// Create a storage object with the App Group
-const storage =
-  Platform.OS === 'ios'
-    ? new ExtensionStorage('group.abunchofknowitalls.remotewol-upsnap')
-    : null;
+const DEVICE_KIND = 'device';
 
-interface WidgetDevice {
-  id: string;
-  name: string;
-  mac: string;
-  ip: string;
-  canSleep: boolean;
-  canShutdown: boolean;
-  status: string;
+let pendingCatalog: AppIntentEntity[] | null = null;
+let catalogWrite: Promise<void> | null = null;
+
+function toWidgetDevice(device: Device): WidgetDevice | null {
+  const id = device.id.trim();
+  if (!id) {
+    return null;
+  }
+
+  return {
+    id,
+    name: device.name.trim() || device.mac.trim() || 'Device',
+    mac: device.mac,
+    ip: device.ip,
+    canSleep: device.sol_enabled,
+    canShutdown: device.shutdown_cmd !== '',
+    status: device.status || 'unknown',
+  };
+}
+
+function toCatalogEntity(device: WidgetDevice): AppIntentEntity {
+  const synonyms = [device.mac, device.ip].filter(value => {
+    const trimmed = value.trim();
+    return trimmed.length > 0 && trimmed !== device.name;
+  });
+
+  return {
+    id: device.id,
+    title: device.name,
+    subtitle: device.mac.trim() || undefined,
+    synonyms,
+  };
+}
+
+function publishDeviceCatalog(entities: AppIntentEntity[]): void {
+  if (!appIntentsAvailable()) {
+    return;
+  }
+
+  pendingCatalog = entities;
+  if (catalogWrite) {
+    return;
+  }
+
+  catalogWrite = drainDeviceCatalog();
+}
+
+async function drainDeviceCatalog(): Promise<void> {
+  while (pendingCatalog) {
+    const next = pendingCatalog;
+    pendingCatalog = null;
+    try {
+      await setEntityCatalogAsync(DEVICE_KIND, next);
+    } catch (error) {
+      console.warn('Could not publish the device catalog.', error);
+      break;
+    }
+  }
+
+  catalogWrite = null;
+  if (pendingCatalog) {
+    catalogWrite = drainDeviceCatalog();
+  }
 }
 
 /**
- * Syncs device data to the iOS widget via App Group shared storage.
- * This allows the widget to display device information and create action deep links.
+ * Syncs device data to the iOS widget and Siri device catalog.
+ * Called after the device list loads.
  */
 export function syncDevicesToWidget(devices: Device[]): void {
-  if (!storage) {
+  if (Platform.OS !== 'ios') {
     return;
   }
 
   try {
-    // Transform devices to the format expected by the widget
-    const widgetDevices: WidgetDevice[] = devices.map(device => ({
-      id: device.id,
-      name: device.name,
-      mac: device.mac,
-      ip: device.ip,
-      canSleep: device.sol_enabled,
-      canShutdown: device.shutdown_cmd !== "",
-      status: device.status || 'unknown',
-    }));
+    const widgetDevices = devices
+      .map(toWidgetDevice)
+      .filter((device): device is WidgetDevice => device !== null);
 
-    const devicesJson = JSON.stringify(widgetDevices);
-    storage.set('devices', devicesJson);
-
-    // Refresh widgets to pick up the new data
-    ExtensionStorage.reloadWidget();
+    DeviceControlWidget.setConfigurationParameterEnum(
+      'device',
+      widgetDevices.map(device => ({
+        name: device.name,
+        value: device.id,
+        subtitle: device.mac.trim() || undefined,
+      }))
+    );
+    DeviceControlWidget.updateSnapshot({ devices: widgetDevices });
+    publishDeviceCatalog(widgetDevices.map(toCatalogEntity));
   } catch (error) {
     console.error('Failed to sync devices to widget:', error);
   }
 }
 
 /**
- * Refreshes all widget timelines to pick up new data.
+ * Refreshes widget timelines so they pick up the latest snapshot.
  */
 export function refreshWidgets(): void {
-  if (!storage) {
+  if (Platform.OS !== 'ios') {
     return;
   }
 
   try {
-    ExtensionStorage.reloadWidget();
+    DeviceControlWidget.reload();
   } catch (error) {
     console.error('Failed to refresh widgets:', error);
   }

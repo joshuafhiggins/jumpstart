@@ -5,12 +5,47 @@ import {
   PermissionResponse,
 } from '../types';
 
+export type AuthCollection = 'users' | '_superusers';
+
+export type ApiError = Error & {
+  status?: number;
+  isAuthError?: boolean;
+};
+
+export type AuthUpdateListener = (auth: AuthResponse) => void | Promise<void>;
+export type AuthFailureListener = (error: unknown) => void | Promise<void>;
+
+const AUTH_ERROR_MESSAGE = /authorization token|invalid token|unauthorized|not authenticated/i;
+
+export function isAuthCollection(value: unknown): value is AuthCollection {
+  return value === 'users' || value === '_superusers';
+}
+
+export function isRevokedAuthError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const status = (error as { status?: unknown }).status;
+  return status === 401 || status === 403 || status === 404;
+}
+
+function isSessionChanged(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { sessionChanged?: boolean }).sessionChanged === true
+  );
+}
+
 class UpSnapAPI {
   private token: string | null = null;
   private address: string | null = null;
   private canCreate: boolean | null = null;
+  private authCollection: AuthCollection | null = null;
+  private authEpoch = 0;
   private unauthorizedHandler: (() => Promise<void>) | null = null;
+  private authUpdateListener: AuthUpdateListener | null = null;
+  private authFailureListener: AuthFailureListener | null = null;
   private isHandlingUnauthorized = false;
+  private refreshInFlight: Promise<AuthResponse> | null = null;
 
   setToken(token: string) {
     this.token = token;
@@ -22,6 +57,7 @@ class UpSnapAPI {
 
   clearToken() {
     this.token = null;
+    this.authEpoch += 1;
   }
 
   setAddress(address: string) {
@@ -48,8 +84,28 @@ class UpSnapAPI {
     this.canCreate = null;
   }
 
+  setAuthCollection(collection: AuthCollection | null) {
+    this.authCollection = collection;
+  }
+
+  getAuthCollection(): AuthCollection | null {
+    return this.authCollection;
+  }
+
+  clearAuthCollection() {
+    this.authCollection = null;
+  }
+
   setUnauthorizedHandler(handler: (() => Promise<void>) | null) {
     this.unauthorizedHandler = handler;
+  }
+
+  setAuthUpdateListener(listener: AuthUpdateListener | null) {
+    this.authUpdateListener = listener;
+  }
+
+  setAuthFailureListener(listener: AuthFailureListener | null) {
+    this.authFailureListener = listener;
   }
 
   private async handleUnauthorized() {
@@ -66,7 +122,7 @@ class UpSnapAPI {
     }
   }
 
-  private async throwApiError(response: Response, fallbackMessage: string): Promise<never> {
+  private async errorFromResponse(response: Response, fallbackMessage: string): Promise<ApiError> {
     let message = fallbackMessage;
 
     try {
@@ -76,22 +132,25 @@ class UpSnapAPI {
       // Ignore JSON parsing errors and use the fallback message.
     }
 
-    const isAuthError =
+    const apiError = new Error(message) as ApiError;
+    apiError.status = response.status;
+    apiError.isAuthError =
       response.status === 401 ||
       response.status === 403 ||
-      /authorization token|invalid token|unauthorized|not authenticated/i.test(message);
+      AUTH_ERROR_MESSAGE.test(message);
+    return apiError;
+  }
 
-    if (isAuthError) {
+  private async throwApiError(
+    response: Response,
+    fallbackMessage: string,
+    skipUnauthorizedHandler = false,
+  ): Promise<never> {
+    const error = await this.errorFromResponse(response, fallbackMessage);
+
+    if (error.isAuthError && !skipUnauthorizedHandler) {
       await this.handleUnauthorized();
     }
-
-    const error = new Error(message) as Error & {
-      status?: number;
-      isAuthError?: boolean;
-    };
-
-    error.status = response.status;
-    error.isAuthError = isAuthError;
 
     throw error;
   }
@@ -108,11 +167,166 @@ class UpSnapAPI {
     return headers;
   }
 
+  private sessionChanged(): ApiError {
+    const error = new Error('Auth session changed') as ApiError & { sessionChanged: true };
+    error.sessionChanged = true;
+    error.isAuthError = true;
+    return error;
+  }
+
+  /**
+   * One refresh is shared by the expiry timer and every request that receives a 401.
+   * PocketBase returns a new auth token and record for the same collection.
+   */
+  async refreshAuth(): Promise<AuthResponse> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = this.performRefresh().finally(() => {
+        this.refreshInFlight = null;
+      });
+    }
+
+    return this.refreshInFlight;
+  }
+
+  private async performRefresh(): Promise<AuthResponse> {
+    const epoch = this.authEpoch;
+    const tokenAtStart = this.token;
+
+    try {
+      if (!tokenAtStart || !this.address) {
+        throw Object.assign(new Error('Not authenticated'), {
+          status: 401,
+          isAuthError: true,
+        }) as ApiError;
+      }
+
+      const collections: AuthCollection[] = this.authCollection
+        ? [this.authCollection]
+        : ['users', '_superusers'];
+      let lastError: ApiError | null = null;
+
+      for (let index = 0; index < collections.length; index += 1) {
+        const collection = collections[index];
+        const response = await fetch(
+          `${this.address}/collections/${collection}/auth-refresh`,
+          {
+            method: 'POST',
+            headers: this.getHeaders(),
+          },
+        );
+
+        if (this.authEpoch !== epoch || this.token !== tokenAtStart) {
+          throw this.sessionChanged();
+        }
+
+        if (response.ok) {
+          const data = (await response.json()) as AuthResponse;
+          if (this.authEpoch !== epoch || this.token !== tokenAtStart) {
+            throw this.sessionChanged();
+          }
+          if (!data?.token) {
+            throw Object.assign(new Error('Auth refresh failed'), {
+              status: 401,
+              isAuthError: true,
+            }) as ApiError;
+          }
+
+          this.authCollection = isAuthCollection(data.record?.collectionName)
+            ? data.record.collectionName
+            : collection;
+          this.token = data.token;
+          if (this.authCollection === '_superusers') {
+            this.canCreate = true;
+          }
+
+          try {
+            await this.authUpdateListener?.(data);
+          } catch (error) {
+            console.error('Failed to persist refreshed auth', error);
+          }
+
+          return data;
+        }
+
+        lastError = await this.errorFromResponse(response, 'Auth refresh failed');
+        const tryNextCollection =
+          !this.authCollection && index < collections.length - 1 && response.status === 403;
+        if (!tryNextCollection) {
+          throw lastError;
+        }
+      }
+
+      throw (
+        lastError ??
+        (Object.assign(new Error('Auth refresh failed'), {
+          status: 401,
+          isAuthError: true,
+        }) as ApiError)
+      );
+    } catch (error) {
+      if (!isSessionChanged(error)) {
+        try {
+          await this.authFailureListener?.(error);
+        } catch (listenerError) {
+          console.error('Failed to handle auth refresh failure', listenerError);
+        }
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * On 401, refresh once and retry the original request.
+   * A second 401, or a refresh the server rejects, ends the session.
+   */
+  private async request(url: string, fallbackMessage: string, init?: RequestInit): Promise<Response> {
+    const send = () =>
+      fetch(url, {
+        ...init,
+        headers: this.getHeaders(),
+      });
+
+    const response = await send();
+    if (response.ok) {
+      return response;
+    }
+
+    if (response.status === 401 && this.token) {
+      try {
+        await this.refreshAuth();
+      } catch (error) {
+        if (isSessionChanged(error)) {
+          throw error;
+        }
+        if (!isRevokedAuthError(error)) {
+          throw error;
+        }
+        await this.handleUnauthorized();
+        return this.throwApiError(response, fallbackMessage, true);
+      }
+
+      const retried = await send();
+      if (!retried.ok) {
+        if (retried.status === 401) {
+          await this.handleUnauthorized();
+          return this.throwApiError(retried, fallbackMessage, true);
+        }
+        return this.throwApiError(retried, fallbackMessage);
+      }
+      return retried;
+    }
+
+    return this.throwApiError(response, fallbackMessage);
+  }
+
   async authenticate(
     serverAddress: string,
     identity: string,
     password: string
   ): Promise<AuthResponse> {
+    this.authEpoch += 1;
+    this.token = null;
+    this.authCollection = null;
     this.address = serverAddress + '/api';
 
     const response = await fetch(
@@ -125,7 +339,7 @@ class UpSnapAPI {
     );
 
     if (!response.ok) {
-      const response = await fetch(
+      const superuserResponse = await fetch(
         `${this.address}/collections/_superusers/auth-with-password`,
         {
           method: 'POST',
@@ -134,18 +348,20 @@ class UpSnapAPI {
         }
       );
 
-      if (!response.ok) {
-        await this.throwApiError(response, 'Authentication failed');
+      if (!superuserResponse.ok) {
+        await this.throwApiError(superuserResponse, 'Authentication failed');
       }
 
-      const data: AuthResponse = await response.json();
+      const data: AuthResponse = await superuserResponse.json();
       this.token = data.token;
+      this.authCollection = '_superusers';
       this.canCreate = true;
       return data;
     }
 
     const data: AuthResponse = await response.json();
     this.token = data.token;
+    this.authCollection = 'users';
 
     const userID = data.record.id;
     const userPermissionResponse = await fetch(
@@ -165,142 +381,80 @@ class UpSnapAPI {
   }
 
   async getDevices(page = 1, perPage = 100): Promise<Device[]> {
-    const response = await fetch(
+    const response = await this.request(
       `${this.address}/collections/devices/records?page=${page}&perPage=${perPage}`,
-      {
-        headers: this.getHeaders(),
-      }
+      'Failed to fetch devices',
     );
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to fetch devices');
-    }
 
     const data = await response.json();
     return data.items;
   }
 
   async getDevice(id: string): Promise<Device> {
-    const response = await fetch(
+    const response = await this.request(
       `${this.address}/collections/devices/records/${id}`,
-      {
-        headers: this.getHeaders(),
-      }
+      'Failed to fetch device',
     );
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to fetch device');
-    }
 
     return response.json();
   }
 
   async createDevice(device: Partial<Device>): Promise<Device> {
-    const response = await fetch(
+    const response = await this.request(
       `${this.address}/collections/devices/records`,
+      'Failed to create device',
       {
         method: 'POST',
-        headers: this.getHeaders(),
         body: JSON.stringify(device),
-      }
+      },
     );
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to create device');
-    }
 
     return response.json();
   }
 
   async updateDevice(id: string, device: Partial<Device>): Promise<Device> {
-    const response = await fetch(
+    const response = await this.request(
       `${this.address}/collections/devices/records/${id}`,
+      'Failed to update device',
       {
         method: 'PATCH',
-        headers: this.getHeaders(),
         body: JSON.stringify(device),
-      }
+      },
     );
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to update device');
-    }
 
     return response.json();
   }
 
   async deleteDevice(id: string): Promise<void> {
-    const response = await fetch(
+    await this.request(
       `${this.address}/collections/devices/records/${id}`,
-      {
-        method: 'DELETE',
-        headers: this.getHeaders(),
-      }
+      'Failed to delete device',
+      { method: 'DELETE' },
     );
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to delete device');
-    }
   }
 
   async wakeDevice(id: string): Promise<void> {
-    const response = await fetch(`${this.address}/upsnap/wake/${id}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to wake device');
-    }
+    await this.request(`${this.address}/upsnap/wake/${id}`, 'Failed to wake device');
   }
 
   async wakeGroup(id: string): Promise<void> {
-    const response = await fetch(`${this.address}/upsnap/wakegroup/${id}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to wake group');
-    }
+    await this.request(`${this.address}/upsnap/wakegroup/${id}`, 'Failed to wake group');
   }
 
   async sleepDevice(id: string): Promise<void> {
-    const response = await fetch(`${this.address}/upsnap/sleep/${id}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to sleep device');
-    }
+    await this.request(`${this.address}/upsnap/sleep/${id}`, 'Failed to sleep device');
   }
 
   async rebootDevice(id: string): Promise<void> {
-    const response = await fetch(`${this.address}/upsnap/reboot/${id}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to reboot device');
-    }
+    await this.request(`${this.address}/upsnap/reboot/${id}`, 'Failed to reboot device');
   }
 
   async shutdownDevice(id: string): Promise<void> {
-    const response = await fetch(`${this.address}/upsnap/shutdown/${id}`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to shutdown device');
-    }
+    await this.request(`${this.address}/upsnap/shutdown/${id}`, 'Failed to shutdown device');
   }
 
   async scanNetwork(): Promise<NetworkScanResult[]> {
-    const response = await fetch(`${this.address}/upsnap/scan`, {
-      headers: this.getHeaders(),
-    });
-
-    if (!response.ok) {
-      await this.throwApiError(response, 'Failed to scan network');
-    }
+    const response = await this.request(`${this.address}/upsnap/scan`, 'Failed to scan network');
 
     const data = await response.json();
     if (data.devices && Array.isArray(data.devices)) {

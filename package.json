@@ -11,12 +11,12 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@bacons/apple-targets": "^3.0.6",
     "@expo/ui": "~58.0.21",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "burnt": "^0.13.0",
     "expo": "^58.0.16",
+    "expo-app-intents": "~0.5.10",
     "expo-constants": "~58.0.12",
     "expo-dev-client": "~58.0.14",
     "expo-font": "~58.0.9",
@@ -30,6 +30,7 @@
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
     "expo-web-browser": "~58.0.6",
+    "expo-widgets": "~58.0.21",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
