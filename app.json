@@ -61,7 +61,10 @@
               "displayName": "Device Control",
               "description": "Control your devices with wake, sleep, restart, and shutdown actions.",
               "ios": {
-                "supportedFamilies": ["systemSmall", "systemMedium"],
+                "supportedFamilies": [
+                  "systemSmall",
+                  "systemMedium"
+                ],
                 "initialLayout": "./src/widgets/DeviceControl.tsx",
                 "configuration": {
                   "title": "Device Control",
@@ -89,7 +92,8 @@
       "expo-font",
       "expo-image",
       "expo-web-browser",
-      "expo-app-intents"
+      "expo-app-intents",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

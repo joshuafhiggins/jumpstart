@@ -11,22 +11,22 @@
     "lint": "expo lint"
   },
   "dependencies": {
-    "@expo/ui": "~58.0.21",
+    "@expo/ui": "~58.0.22",
     "@expo/vector-icons": "^15.0.3",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "burnt": "^0.13.0",
-    "expo": "^58.0.16",
-    "expo-app-intents": "~0.5.10",
+    "expo": "^58.0.17",
+    "expo-app-intents": "~0.5.11",
     "expo-constants": "~58.0.12",
     "expo-dev-client": "~58.0.14",
     "expo-font": "~58.0.9",
     "expo-glass-effect": "~58.0.4",
     "expo-haptics": "~58.0.7",
     "expo-image": "~58.0.16",
-    "expo-linking": "~58.0.13",
-    "expo-router": "~58.0.24",
-    "expo-splash-screen": "~58.0.10",
-    "expo-status-bar": "~58.0.3",
+    "expo-linking": "~58.0.14",
+    "expo-router": "~58.0.25",
+    "expo-splash-screen": "~58.0.11",
+    "expo-status-bar": "~58.0.4",
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.6",
     "expo-web-browser": "~58.0.6",
@@ -47,5 +47,12 @@
     "eslint-config-expo": "~58.0.4",
     "typescript": "~6.0.3"
   },
-  "private": true
+  "private": true,
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "12.2.1",
+      "onFail": "download"
+    }
+  }
 }
